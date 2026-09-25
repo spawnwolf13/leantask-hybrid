@@ -18,9 +18,10 @@ interface ColumnContainerProps {
   column: Column
   activeTasks: Task[]
   dragHandleProps?: DraggableProvidedDragHandleProps | null
+  onOpenTask: (taskId: string) => void
 }
 
-export function ColumnContainer({ column, activeTasks, dragHandleProps }: ColumnContainerProps) {
+export function ColumnContainer({ column, activeTasks, dragHandleProps, onOpenTask }: ColumnContainerProps) {
   const completedTasks = useCompletedTasks(column.id)
   const [deleteTarget, setDeleteTarget] = useState<Column | null>(null)
 
@@ -39,6 +40,7 @@ export function ColumnContainer({ column, activeTasks, dragHandleProps }: Column
                       task={task}
                       dragHandleProps={dragProvided.dragHandleProps}
                       isDragging={dragSnapshot.isDragging}
+                      onOpen={() => onOpenTask(task.id)}
                     />
                   </div>
                 )}
@@ -58,7 +60,7 @@ export function ColumnContainer({ column, activeTasks, dragHandleProps }: Column
           </AccordionTrigger>
           <AccordionContent className="flex flex-col gap-2 pb-0">
             {completedTasks.map((task) => (
-              <TaskCard key={task.id} task={task} />
+              <TaskCard key={task.id} task={task} onOpen={() => onOpenTask(task.id)} />
             ))}
           </AccordionContent>
         </AccordionItem>

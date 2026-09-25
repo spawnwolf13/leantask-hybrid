@@ -7,6 +7,7 @@ import { useCategories } from '@/hooks/useCategories'
 import { useColumns } from '@/hooks/useColumns'
 import { useActiveTasksForCategory } from '@/hooks/useTasks'
 import type { Task } from '@/types/entities'
+import { TaskEditModal } from '@/components/modals/TaskEditModal'
 import { AddColumnButton } from './AddColumnButton'
 import { CategoryBar } from './CategoryBar'
 import { ColumnContainer } from './ColumnContainer'
@@ -14,6 +15,7 @@ import { ColumnContainer } from './ColumnContainer'
 export function BoardView() {
   const categories = useCategories()
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | undefined>(undefined)
+  const [openTaskId, setOpenTaskId] = useState<string | null>(null)
 
   // Derived during render rather than synced via effect: falls back to the
   // first category whenever the selection is unset or its category was deleted.
@@ -107,6 +109,7 @@ export function BoardView() {
                           column={column}
                           activeTasks={activeTasksByColumn.get(column.id) ?? []}
                           dragHandleProps={dragProvided.dragHandleProps}
+                          onOpenTask={setOpenTaskId}
                         />
                       </div>
                     )}
@@ -119,6 +122,8 @@ export function BoardView() {
           </Droppable>
         </DragDropContext>
       )}
+
+      <TaskEditModal taskId={openTaskId} onClose={() => setOpenTaskId(null)} />
     </div>
   )
 }

@@ -1,4 +1,5 @@
 import { db } from './db'
+import type { ImageAttachment, Task } from '@/types/entities'
 
 export async function createTask(categoryId: string, columnId: string, title: string): Promise<string> {
   const id = crypto.randomUUID()
@@ -32,6 +33,37 @@ export async function createTask(categoryId: string, columnId: string, title: st
 
 export async function toggleTaskCompletion(taskId: string, isCompleted: boolean): Promise<void> {
   await db.tasks.update(taskId, { isCompleted, updatedAt: Date.now() })
+}
+
+type TaskEditableFields = Pick<
+  Task,
+  'title' | 'description' | 'startDate' | 'startTime' | 'durationMinutes'
+>
+
+export async function updateTask(taskId: string, patch: Partial<TaskEditableFields>): Promise<void> {
+  await db.tasks.update(taskId, { ...patch, updatedAt: Date.now() })
+}
+
+export async function deleteTask(taskId: string): Promise<void> {
+  await db.transaction('rw', db.tasks, db.checklistItems, db.syncQueue, async () => {
+    await db.checklistItems.where('taskId').equals(taskId).delete()
+    await db.syncQueue.where('taskId').equals(taskId).delete()
+    await db.tasks.delete(taskId)
+  })
+}
+
+export async function addTaskImage(taskId: string, image: ImageAttachment): Promise<void> {
+  await db.tasks.where('id').equals(taskId).modify((task) => {
+    task.images.push(image)
+    task.updatedAt = Date.now()
+  })
+}
+
+export async function removeTaskImage(taskId: string, imageId: string): Promise<void> {
+  await db.tasks.where('id').equals(taskId).modify((task) => {
+    task.images = task.images.filter((image) => image.id !== imageId)
+    task.updatedAt = Date.now()
+  })
 }
 
 interface MoveTaskParams {
