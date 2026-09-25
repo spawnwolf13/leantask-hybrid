@@ -160,6 +160,7 @@ export function CalendarView({ onOpenTask }: CalendarViewProps) {
           right: 'dayGridMonth,timeGridWeek,timeGridDay',
         }}
         editable
+        slotEventOverlap={false}
         eventResizableFromStart
         height="auto"
         events={events}

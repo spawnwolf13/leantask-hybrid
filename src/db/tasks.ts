@@ -1,4 +1,5 @@
 import { db } from './db'
+import { addDays, format, parseISO } from 'date-fns'
 import type { ImageAttachment, Task } from '@/types/entities'
 
 export async function createTask(categoryId: string, columnId: string, title: string): Promise<string> {
@@ -128,4 +129,72 @@ export async function moveTask({
       ),
     ])
   })
+}
+
+function shiftDateByOneDay(date: string): string {
+  return format(addDays(parseISO(date), 1), 'yyyy-MM-dd')
+}
+
+/** Clones a task (and its subtasks, unchecked) directly below the source in the same column. */
+export async function duplicateTask(taskId: string): Promise<string | undefined> {
+  const cloneId = crypto.randomUUID()
+  const now = Date.now()
+
+  await db.transaction('rw', db.tasks, db.checklistItems, async () => {
+    const source = await db.tasks.get(taskId)
+    if (!source) return
+
+    const columnTasks = await db.tasks
+      .where('columnId')
+      .equals(source.columnId)
+      .and((task) => !task.isCompleted)
+      .toArray()
+
+    // A completed source lives in the Done zone; its clone starts active, at the end of the column.
+    const insertIndex = source.isCompleted
+      ? columnTasks.reduce((max, task) => Math.max(max, task.orderIndex), -1) + 1
+      : source.orderIndex + 1
+    await Promise.all(
+      columnTasks
+        .filter((task) => task.orderIndex >= insertIndex)
+        .map((task) => db.tasks.update(task.id, { orderIndex: task.orderIndex + 1, updatedAt: now })),
+    )
+
+    const [cover] = source.images
+    await db.tasks.add({
+      id: cloneId,
+      categoryId: source.categoryId,
+      columnId: source.columnId,
+      title: `${source.title} (Copy)`,
+      description: source.description,
+      color: source.color,
+      durationMinutes: source.durationMinutes,
+      startTime: source.startTime,
+      recurrence: source.recurrence,
+      // Shift the deadline with the start so the clone never ends up due before it starts.
+      startDate: source.startDate ? shiftDateByOneDay(source.startDate) : undefined,
+      dueDate: source.startDate && source.dueDate ? shiftDateByOneDay(source.dueDate) : source.dueDate,
+      orderIndex: insertIndex,
+      isCompleted: false,
+      timeSpentSeconds: 0,
+      images: cover ? [{ ...cover, id: crypto.randomUUID(), createdAt: now }] : [],
+      createdAt: now,
+      updatedAt: now,
+    })
+
+    const items = await db.checklistItems.where('taskId').equals(taskId).sortBy('orderIndex')
+    await db.checklistItems.bulkAdd(
+      items.map((item, index) => ({
+        ...item,
+        id: crypto.randomUUID(),
+        taskId: cloneId,
+        isCompleted: false,
+        orderIndex: index,
+        createdAt: now,
+        updatedAt: now,
+      })),
+    )
+  })
+
+  return cloneId
 }

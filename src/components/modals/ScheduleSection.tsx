@@ -1,12 +1,24 @@
+import { useLiveQuery } from 'dexie-react-hooks'
 import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { db } from '@/db/db'
 import { updateTask } from '@/db/tasks'
 import { cn } from '@/lib/utils'
 import { useDirtyFlag } from '@/services/unsavedChanges'
 import { DURATION_PRESETS, formatDuration, formatScheduleRange } from '@/utils/schedule'
 import type { RecurrenceFrequency, Task } from '@/types/entities'
+
+function toMinutes(time: string): number {
+  const [h, m] = time.split(':').map(Number)
+  return h * 60 + m
+}
+
+function fromMinutes(total: number): string {
+  const wrapped = ((total % 1440) + 1440) % 1440
+  return `${String(Math.floor(wrapped / 60)).padStart(2, '0')}:${String(wrapped % 60).padStart(2, '0')}`
+}
 
 const DAY_PILLS = ['S', 'M', 'T', 'W', 'T', 'F', 'S']
 const REPEAT_OPTIONS: { value: RecurrenceFrequency | 'none'; label: string }[] = [
@@ -61,6 +73,24 @@ export function ScheduleSection({ task }: ScheduleSectionProps) {
     setDateError(null)
     void updateTask(task.id, { dueDate: value || undefined })
   }
+
+  const sameDayTasks = useLiveQuery(
+    (): Promise<Task[]> => (startDate ? db.tasks.where('startDate').equals(startDate).toArray() : Promise.resolve([])),
+    [startDate],
+    [],
+  )
+  const effortMinutes = (Number.parseInt(hours, 10) || 0) * 60 + (Number.parseInt(minutes, 10) || 0)
+  const overlaps =
+    startTime && effortMinutes > 0
+      ? sameDayTasks.filter((other) => {
+          if (other.id === task.id || !other.startTime || !other.durationMinutes) return false
+          const aStart = toMinutes(startTime)
+          const aEnd = aStart + effortMinutes
+          const bStart = toMinutes(other.startTime)
+          const bEnd = bStart + other.durationMinutes
+          return aStart < bEnd && aEnd > bStart
+        })
+      : []
 
   const repeatValue: RecurrenceFrequency | 'none' = task.recurrence?.frequency ?? 'none'
 
@@ -141,6 +171,17 @@ export function ScheduleSection({ task }: ScheduleSectionProps) {
           {dateError}
         </p>
       )}
+      {overlaps.map((other) => (
+        <div
+          key={other.id}
+          data-testid="overlap-warning"
+          className="mt-2 rounded border border-amber-500/30 bg-amber-500/10 p-2.5 text-xs text-amber-300"
+        >
+          ⚠️ Warning: Overlaps with '{other.title}' ({other.startTime} –{' '}
+          {fromMinutes(toMinutes(other.startTime!) + other.durationMinutes!)}). Consider adding a 10–15 min buffer to
+          protect your focus.
+        </div>
+      ))}
 
       <div className="space-y-1">
         <Label>Estimated Work Effort</Label>

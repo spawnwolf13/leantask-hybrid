@@ -9,7 +9,9 @@ import {
 import { Input } from '@/components/ui/input'
 import { Separator } from '@/components/ui/separator'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { deleteTask, updateTask } from '@/db/tasks'
+import { Copy } from 'lucide-react'
+import { toast } from 'sonner'
+import { deleteTask, duplicateTask, updateTask } from '@/db/tasks'
 import { attachImageToTask } from '@/services/attachImage'
 import { useDirtyFlag } from '@/services/unsavedChanges'
 import type { Task } from '@/types/entities'
@@ -51,6 +53,11 @@ export function TaskEditForm({ task, defaultTab, onClose }: TaskEditFormProps) {
     if (!file) return
     event.preventDefault()
     await attachImageToTask(task.id, file)
+  }
+
+  async function handleDuplicate() {
+    await duplicateTask(task.id)
+    toast('Task duplicated', { description: `"${task.title} (Copy)" added below the original.` })
   }
 
   async function handleConfirmDelete() {
@@ -131,6 +138,10 @@ export function TaskEditForm({ task, defaultTab, onClose }: TaskEditFormProps) {
       <DialogFooter className="pt-2">
         <Button type="button" variant="destructive" className="sm:mr-auto" onClick={() => setIsDeleteOpen(true)}>
           Delete Task
+        </Button>
+        <Button type="button" variant="outline" onClick={() => void handleDuplicate()}>
+          <Copy className="size-4" />
+          Duplicate
         </Button>
         <Button type="button" variant="outline" onClick={onClose}>
           Close

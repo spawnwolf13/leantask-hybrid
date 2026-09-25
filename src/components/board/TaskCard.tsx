@@ -1,10 +1,16 @@
 import type { DraggableProvidedDragHandleProps } from '@hello-pangea/dnd'
 import { format, parseISO } from 'date-fns'
-import { CalendarDays, CheckSquare, Flag, GripVertical, Repeat, Timer } from 'lucide-react'
+import { CalendarDays, CheckSquare, Copy, Flag, GripVertical, MoreHorizontal, Repeat, Timer } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Card } from '@/components/ui/card'
 import { Checkbox } from '@/components/ui/checkbox'
-import { toggleTaskCompletion } from '@/db/tasks'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
+import { duplicateTask, toggleTaskCompletion } from '@/db/tasks'
 import { useChecklistItems } from '@/hooks/useChecklistItems'
 import { useElapsedSeconds } from '@/hooks/useElapsedSeconds'
 import { useObjectUrl } from '@/hooks/useObjectUrl'
@@ -58,6 +64,24 @@ export function TaskCard({ task, dragHandleProps, isDragging, onOpen }: TaskCard
         >
           {task.title}
         </span>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button
+              type="button"
+              aria-label="Task actions"
+              onClick={(event) => event.stopPropagation()}
+              className="rounded text-muted-foreground hover:bg-accent hover:text-foreground"
+            >
+              <MoreHorizontal className="size-4" />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" onClick={(event) => event.stopPropagation()}>
+            <DropdownMenuItem onSelect={() => void duplicateTask(task.id)}>
+              <Copy className="size-4" />
+              Duplicate
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
         {dragHandleProps && (
           <span
             {...dragHandleProps}
