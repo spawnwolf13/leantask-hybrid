@@ -4,7 +4,7 @@ import interactionPlugin from '@fullcalendar/interaction'
 import type { EventResizeDoneArg } from '@fullcalendar/interaction'
 import FullCalendar from '@fullcalendar/react'
 import timeGridPlugin from '@fullcalendar/timegrid'
-import { addDays, addMinutes, differenceInCalendarDays, differenceInMinutes, format, parseISO } from 'date-fns'
+import { addDays, addMinutes, differenceInMinutes, format, parseISO } from 'date-fns'
 import { useMemo } from 'react'
 import { updateTask } from '@/db/tasks'
 import { useCategories } from '@/hooks/useCategories'
@@ -111,7 +111,7 @@ export function CalendarView({ onOpenTask }: CalendarViewProps) {
         return dateOnlyEvent(task.startDate, task.dueDate && task.dueDate > task.startDate ? task.dueDate : undefined)
       }
 
-      return { ...dateOnlyEvent(task.dueDate as string), title: `Due: ${task.title}` }
+      return { ...dateOnlyEvent(task.dueDate as string), title: `Due: ${task.title}`, editable: false }
     })
   }, [tasks, categoryNameById])
 
@@ -119,29 +119,34 @@ export function CalendarView({ onOpenTask }: CalendarViewProps) {
     onOpenTask((arg.event.extendedProps as TaskEventExtendedProps).taskId)
   }
 
+  // Deadlines are fixed milestones: drag/resize only ever touches startDate/startTime/durationMinutes.
   async function handleEventDrop(arg: EventDropArg) {
     const start = arg.event.start
     if (!start) return
-    const task = tasks.find((candidate) => candidate.id === arg.event.id)
-    const previousDate = task?.startDate ?? task?.dueDate
-    // Move the deadline by the same number of days so a multi-day span keeps its length.
-    const dayShift = previousDate ? differenceInCalendarDays(start, parseISO(previousDate)) : 0
-    const shiftedDueDate = task?.dueDate ? format(addDays(parseISO(task.dueDate), dayShift), 'yyyy-MM-dd') : undefined
-    if (!task?.startDate) {
-      await updateTask(arg.event.id, { dueDate: format(start, 'yyyy-MM-dd') })
+    const startDate = format(start, 'yyyy-MM-dd')
+    const dueDate = tasks.find((candidate) => candidate.id === arg.event.id)?.dueDate
+    if (dueDate && startDate > dueDate) {
+      arg.revert()
       return
     }
     await updateTask(arg.event.id, {
-      startDate: format(start, 'yyyy-MM-dd'),
+      startDate,
       startTime: arg.event.allDay ? undefined : format(start, 'HH:mm'),
-      dueDate: shiftedDueDate,
     })
   }
 
   async function handleEventResize(arg: EventResizeDoneArg) {
     const { start, end } = arg.event
-    if (!start || !end) return
-    await updateTask(arg.event.id, { durationMinutes: differenceInMinutes(end, start) })
+    // An all-day span's edges are set via Start/Due Date in the task modal, not by resizing.
+    if (!start || !end || arg.event.allDay) {
+      arg.revert()
+      return
+    }
+    await updateTask(arg.event.id, {
+      startDate: format(start, 'yyyy-MM-dd'),
+      startTime: format(start, 'HH:mm'),
+      durationMinutes: differenceInMinutes(end, start),
+    })
   }
 
   return (

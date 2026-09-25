@@ -14,7 +14,7 @@ export default defineConfig({
       manifest: {
         name: 'LeanTask - Personal Task & Time Manager',
         short_name: 'LeanTask',
-        description: 'High-performance, offline-first personal Kanban and time-blocking planner.',
+        description: 'High-performance, offline-first personal task board and time-blocking planner.',
         theme_color: '#0f172a',
         background_color: '#0f172a',
         display: 'standalone',
