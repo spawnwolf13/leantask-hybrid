@@ -11,6 +11,9 @@ export class LeanTaskDB extends Dexie {
   constructor() {
     super('LeanTaskHybridDB')
 
+    // Note: isCompleted is a boolean, which IndexedDB cannot use inside a compound
+    // index key range — queries filtering on it alongside categoryId/columnId use
+    // this single-field index plus an in-memory filter, which Dexie handles cleanly.
     this.version(1).stores({
       categories: 'id, orderIndex',
       columns: 'id, categoryId, orderIndex',
