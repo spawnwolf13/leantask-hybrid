@@ -38,7 +38,7 @@ export async function toggleTaskCompletion(taskId: string, isCompleted: boolean)
 
 type TaskEditableFields = Pick<
   Task,
-  'title' | 'description' | 'startDate' | 'startTime' | 'durationMinutes' | 'color' | 'recurrence'
+  'title' | 'description' | 'startDate' | 'dueDate' | 'startTime' | 'durationMinutes' | 'color' | 'recurrence'
 >
 
 export async function updateTask(taskId: string, patch: Partial<TaskEditableFields>): Promise<void> {

@@ -4,7 +4,7 @@ import interactionPlugin from '@fullcalendar/interaction'
 import type { EventResizeDoneArg } from '@fullcalendar/interaction'
 import FullCalendar from '@fullcalendar/react'
 import timeGridPlugin from '@fullcalendar/timegrid'
-import { addMinutes, differenceInMinutes, format, parseISO } from 'date-fns'
+import { addDays, addMinutes, differenceInCalendarDays, differenceInMinutes, format, parseISO } from 'date-fns'
 import { useMemo } from 'react'
 import { updateTask } from '@/db/tasks'
 import { useCategories } from '@/hooks/useCategories'
@@ -27,6 +27,8 @@ interface CalendarViewProps {
 interface TaskEventExtendedProps {
   categoryName: string
   isCompleted: boolean
+  taskId: string
+  isDueMarker?: boolean
 }
 
 export function CalendarView({ onOpenTask }: CalendarViewProps) {
@@ -39,11 +41,12 @@ export function CalendarView({ onOpenTask }: CalendarViewProps) {
 
   const events = useMemo((): EventInput[] => {
     // useScheduledTasks() guarantees every task here has either a startDate or a recurrence rule.
-    return tasks.map((task) => {
+    return tasks.flatMap((task) => {
       const color = task.color ?? getCategoryColor(task.categoryId)
       const extendedProps: TaskEventExtendedProps = {
         categoryName: categoryNameById.get(task.categoryId) ?? '',
         isCompleted: task.isCompleted,
+        taskId: task.id,
       }
 
       if (task.recurrence) {
@@ -62,10 +65,24 @@ export function CalendarView({ onOpenTask }: CalendarViewProps) {
         }
       }
 
-      if (task.startTime && task.durationMinutes) {
+      const dateOnlyEvent = (start: string, end?: string): EventInput => ({
+        id: task.id,
+        title: task.title,
+        start,
+        // FullCalendar's all-day end is exclusive, so a due date of Oct 10 ends at Oct 11.
+        end: end ? format(addDays(parseISO(end), 1), 'yyyy-MM-dd') : undefined,
+        allDay: true,
+        backgroundColor: color,
+        borderColor: color,
+        extendedProps,
+      })
+
+      // Only tasks with an explicit start time AND estimated effort get a slot on the hourly grid,
+      // and only on their start day — a multi-day span never becomes one giant time block.
+      if (task.startDate && task.startTime && task.durationMinutes) {
         const start = parseISO(`${task.startDate}T${task.startTime}`)
         const end = addMinutes(start, task.durationMinutes)
-        return {
+        const timedEvent: EventInput = {
           id: task.id,
           title: task.title,
           start,
@@ -75,30 +92,49 @@ export function CalendarView({ onOpenTask }: CalendarViewProps) {
           borderColor: color,
           extendedProps,
         }
+        if (task.dueDate && task.dueDate > task.startDate) {
+          return [
+            timedEvent,
+            {
+              ...dateOnlyEvent(task.dueDate),
+              id: `${task.id}:due`,
+              title: `Due: ${task.title}`,
+              editable: false,
+              extendedProps: { ...extendedProps, isDueMarker: true },
+            },
+          ]
+        }
+        return timedEvent
       }
 
-      return {
-        id: task.id,
-        title: task.title,
-        start: task.startDate,
-        allDay: true,
-        backgroundColor: color,
-        borderColor: color,
-        extendedProps,
+      if (task.startDate) {
+        return dateOnlyEvent(task.startDate, task.dueDate && task.dueDate > task.startDate ? task.dueDate : undefined)
       }
+
+      return { ...dateOnlyEvent(task.dueDate as string), title: `Due: ${task.title}` }
     })
   }, [tasks, categoryNameById])
 
   function handleEventClick(arg: EventClickArg) {
-    onOpenTask(arg.event.id)
+    onOpenTask((arg.event.extendedProps as TaskEventExtendedProps).taskId)
   }
 
   async function handleEventDrop(arg: EventDropArg) {
     const start = arg.event.start
     if (!start) return
+    const task = tasks.find((candidate) => candidate.id === arg.event.id)
+    const previousDate = task?.startDate ?? task?.dueDate
+    // Move the deadline by the same number of days so a multi-day span keeps its length.
+    const dayShift = previousDate ? differenceInCalendarDays(start, parseISO(previousDate)) : 0
+    const shiftedDueDate = task?.dueDate ? format(addDays(parseISO(task.dueDate), dayShift), 'yyyy-MM-dd') : undefined
+    if (!task?.startDate) {
+      await updateTask(arg.event.id, { dueDate: format(start, 'yyyy-MM-dd') })
+      return
+    }
     await updateTask(arg.event.id, {
       startDate: format(start, 'yyyy-MM-dd'),
       startTime: arg.event.allDay ? undefined : format(start, 'HH:mm'),
+      dueDate: shiftedDueDate,
     })
   }
 

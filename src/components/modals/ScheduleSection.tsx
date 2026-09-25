@@ -4,6 +4,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { updateTask } from '@/db/tasks'
 import { cn } from '@/lib/utils'
+import { useDirtyFlag } from '@/services/unsavedChanges'
 import { DURATION_PRESETS, formatDuration, formatScheduleRange } from '@/utils/schedule'
 import type { RecurrenceFrequency, Task } from '@/types/entities'
 
@@ -25,10 +26,41 @@ function clamp(value: number, min: number, max: number): number {
 
 export function ScheduleSection({ task }: ScheduleSectionProps) {
   const [startDate, setStartDate] = useState(task.startDate ?? '')
+  const [dueDate, setDueDate] = useState(task.dueDate ?? '')
+  const [dateError, setDateError] = useState<string | null>(null)
   const [startTime, setStartTime] = useState(task.startTime ?? '')
   const [hours, setHours] = useState(Math.floor((task.durationMinutes ?? 0) / 60).toString())
   const [minutes, setMinutes] = useState(((task.durationMinutes ?? 0) % 60).toString())
   const [customDays, setCustomDays] = useState<number[]>(task.recurrence?.daysOfWeek ?? [])
+
+  const savedMinutes = task.durationMinutes ?? 0
+  useDirtyFlag(
+    'schedule',
+    startDate !== (task.startDate ?? '') ||
+      dueDate !== (task.dueDate ?? '') ||
+      startTime !== (task.startTime ?? '') ||
+      (Number.parseInt(hours, 10) || 0) * 60 + (Number.parseInt(minutes, 10) || 0) !== savedMinutes,
+  )
+
+  function changeStartDate(value: string) {
+    setStartDate(value)
+    if (value && dueDate && dueDate < value) {
+      setDateError('Due date cannot be earlier than the start date.')
+      return
+    }
+    setDateError(null)
+    void updateTask(task.id, { startDate: value || undefined })
+  }
+
+  function changeDueDate(value: string) {
+    setDueDate(value)
+    if (value && startDate && value < startDate) {
+      setDateError('Due date cannot be earlier than the start date.')
+      return
+    }
+    setDateError(null)
+    void updateTask(task.id, { dueDate: value || undefined })
+  }
 
   const repeatValue: RecurrenceFrequency | 'none' = task.recurrence?.frequency ?? 'none'
 
@@ -70,21 +102,29 @@ export function ScheduleSection({ task }: ScheduleSectionProps) {
 
   return (
     <div className="space-y-3">
-      <div className="flex gap-2">
-        <div className="flex-1 space-y-1">
-          <Label htmlFor="task-start-date">Start date</Label>
+      <div className="flex flex-wrap gap-2">
+        <div className="min-w-[9rem] flex-1 space-y-1">
+          <Label htmlFor="task-start-date">Start Date</Label>
           <Input
             id="task-start-date"
             type="date"
             value={startDate}
-            onChange={(event) => {
-              setStartDate(event.target.value)
-              void updateTask(task.id, { startDate: event.target.value || undefined })
-            }}
+            max={dueDate || undefined}
+            onChange={(event) => changeStartDate(event.target.value)}
           />
         </div>
-        <div className="flex-1 space-y-1">
-          <Label htmlFor="task-start-time">Start time</Label>
+        <div className="min-w-[9rem] flex-1 space-y-1">
+          <Label htmlFor="task-due-date">Due Date (Deadline)</Label>
+          <Input
+            id="task-due-date"
+            type="date"
+            value={dueDate}
+            min={startDate || undefined}
+            onChange={(event) => changeDueDate(event.target.value)}
+          />
+        </div>
+        <div className="min-w-[9rem] flex-1 space-y-1">
+          <Label htmlFor="task-start-time">Start Time</Label>
           <Input
             id="task-start-time"
             type="time"
@@ -96,9 +136,14 @@ export function ScheduleSection({ task }: ScheduleSectionProps) {
           />
         </div>
       </div>
+      {dateError && (
+        <p role="alert" className="text-sm text-destructive">
+          {dateError}
+        </p>
+      )}
 
       <div className="space-y-1">
-        <Label>Duration</Label>
+        <Label>Estimated Work Effort</Label>
         <div className="flex flex-wrap items-center gap-2">
           {DURATION_PRESETS.map((preset) => (
             <Button

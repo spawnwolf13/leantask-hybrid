@@ -41,7 +41,9 @@ export interface Task {
   orderIndex: number
   isCompleted: boolean
   startDate?: string
+  dueDate?: string
   startTime?: string
+  /** Estimated work effort — not the span between start and due date. */
   durationMinutes?: number
   color?: string
   timeSpentSeconds: number

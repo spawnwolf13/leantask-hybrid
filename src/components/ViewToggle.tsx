@@ -17,7 +17,7 @@ export function ViewToggle({ view, onChange }: ViewToggleProps) {
         onClick={() => onChange('board')}
       >
         <LayoutGrid className="size-4" />
-        Kanban Board
+        Tasks Board
       </Button>
       <Button
         size="sm"

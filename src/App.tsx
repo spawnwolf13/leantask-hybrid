@@ -1,15 +1,17 @@
 import { Settings } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { BoardView } from '@/components/board/BoardView'
 import { CalendarView } from '@/components/calendar/CalendarView'
 import { SettingsModal } from '@/components/modals/SettingsModal'
-import { TaskEditModal } from '@/components/modals/TaskEditModal'
+import { TaskDetailModal, type TaskModalTab } from '@/components/modals/TaskDetailModal'
 import { StorageStatusChip } from '@/components/StorageStatusChip'
 import { ThemeToggle } from '@/components/ThemeToggle'
 import { Button } from '@/components/ui/button'
 import { Toaster } from '@/components/ui/sonner'
 import { ViewToggle, type BoardOrCalendarView } from '@/components/ViewToggle'
+import { useActiveTimerTaskId } from '@/hooks/useActiveTimerTaskId'
 import { startNotificationScheduler } from '@/services/notificationService'
+import { hasUnsavedChanges } from '@/services/unsavedChanges'
 
 const VIEW_STORAGE_KEY = 'leantask-view'
 
@@ -17,7 +19,12 @@ function App() {
   const [view, setViewState] = useState<BoardOrCalendarView>(() =>
     localStorage.getItem(VIEW_STORAGE_KEY) === 'calendar' ? 'calendar' : 'board',
   )
-  const [openTaskId, setOpenTaskId] = useState<string | null>(null)
+  const [openTask, setOpenTask] = useState<{ id: string; tab: TaskModalTab } | null>(null)
+  const activeTimerTaskId = useActiveTimerTaskId()
+  const activeTimerRef = useRef(activeTimerTaskId)
+  useEffect(() => {
+    activeTimerRef.current = activeTimerTaskId
+  }, [activeTimerTaskId])
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
 
   function setView(next: BoardOrCalendarView) {
@@ -26,6 +33,16 @@ function App() {
   }
 
   useEffect(() => startNotificationScheduler(), [])
+
+  useEffect(() => {
+    function handleBeforeUnload(event: BeforeUnloadEvent) {
+      if (activeTimerRef.current === null && !hasUnsavedChanges()) return
+      event.preventDefault()
+      event.returnValue = ''
+    }
+    window.addEventListener('beforeunload', handleBeforeUnload)
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload)
+  }, [])
 
   return (
     <div className="flex h-screen flex-col bg-background text-foreground">
@@ -41,9 +58,9 @@ function App() {
 
       <main className="flex flex-1 flex-col overflow-hidden">
         {view === 'board' ? (
-          <BoardView onOpenTask={setOpenTaskId} />
+          <BoardView onOpenTask={(id) => setOpenTask({ id, tab: 'edit' })} />
         ) : (
-          <CalendarView onOpenTask={setOpenTaskId} />
+          <CalendarView onOpenTask={(id) => setOpenTask({ id, tab: 'preview' })} />
         )}
       </main>
 
@@ -51,7 +68,7 @@ function App() {
         <StorageStatusChip />
       </footer>
 
-      <TaskEditModal taskId={openTaskId} onClose={() => setOpenTaskId(null)} />
+      <TaskDetailModal taskId={openTask?.id ?? null} defaultTab={openTask?.tab ?? 'edit'} onClose={() => setOpenTask(null)} />
       <SettingsModal open={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} />
       <Toaster />
     </div>

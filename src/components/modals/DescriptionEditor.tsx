@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Textarea } from '@/components/ui/textarea'
 import { updateTask } from '@/db/tasks'
+import { useDirtyFlag } from '@/services/unsavedChanges'
 
 interface DescriptionEditorProps {
   taskId: string
@@ -12,6 +13,7 @@ interface DescriptionEditorProps {
 
 export function DescriptionEditor({ taskId, initialDescription }: DescriptionEditorProps) {
   const [description, setDescription] = useState(initialDescription)
+  useDirtyFlag('task-description', description !== initialDescription)
 
   return (
     <Tabs defaultValue="write">

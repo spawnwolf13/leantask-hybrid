@@ -1,5 +1,6 @@
 import type { DraggableProvidedDragHandleProps } from '@hello-pangea/dnd'
-import { CalendarDays, CheckSquare, GripVertical, Repeat, Timer } from 'lucide-react'
+import { format, parseISO } from 'date-fns'
+import { CalendarDays, CheckSquare, Flag, GripVertical, Repeat, Timer } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Card } from '@/components/ui/card'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -76,12 +77,18 @@ export function TaskCard({ task, dragHandleProps, isDragging, onOpen }: TaskCard
         <img src={thumbnailUrl} alt="" className="mt-2 h-16 w-full rounded object-cover" />
       )}
 
-      {(scheduleLabel || task.recurrence || checklistItems.length > 0 || showTimerBadge) && (
+      {(scheduleLabel || task.dueDate || task.recurrence || checklistItems.length > 0 || showTimerBadge) && (
         <div className="mt-2 flex flex-wrap gap-1.5">
           {scheduleLabel && (
             <Badge variant="outline" className="gap-1 text-[11px] font-normal text-muted-foreground">
               <CalendarDays className="size-3" />
               {scheduleLabel}
+            </Badge>
+          )}
+          {task.dueDate && (
+            <Badge variant="outline" className="gap-1 text-[11px] font-normal text-muted-foreground">
+              <Flag className="size-3" />
+              Due {format(parseISO(task.dueDate), 'MMM d')}
             </Badge>
           )}
           {task.recurrence && (
