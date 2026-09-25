@@ -5,7 +5,15 @@ import { Label } from '@/components/ui/label'
 import { updateTask } from '@/db/tasks'
 import { cn } from '@/lib/utils'
 import { DURATION_PRESETS, formatDuration, formatScheduleRange } from '@/utils/schedule'
-import type { Task } from '@/types/entities'
+import type { RecurrenceFrequency, Task } from '@/types/entities'
+
+const DAY_PILLS = ['S', 'M', 'T', 'W', 'T', 'F', 'S']
+const REPEAT_OPTIONS: { value: RecurrenceFrequency | 'none'; label: string }[] = [
+  { value: 'none', label: 'None' },
+  { value: 'daily', label: 'Daily' },
+  { value: 'weekdays', label: 'Weekdays (Mon-Fri)' },
+  { value: 'custom', label: 'Custom Days' },
+]
 
 interface ScheduleSectionProps {
   task: Task
@@ -20,6 +28,25 @@ export function ScheduleSection({ task }: ScheduleSectionProps) {
   const [startTime, setStartTime] = useState(task.startTime ?? '')
   const [hours, setHours] = useState(Math.floor((task.durationMinutes ?? 0) / 60).toString())
   const [minutes, setMinutes] = useState(((task.durationMinutes ?? 0) % 60).toString())
+  const [customDays, setCustomDays] = useState<number[]>(task.recurrence?.daysOfWeek ?? [])
+
+  const repeatValue: RecurrenceFrequency | 'none' = task.recurrence?.frequency ?? 'none'
+
+  function applyRepeat(next: RecurrenceFrequency | 'none') {
+    if (next === 'none') {
+      void updateTask(task.id, { recurrence: undefined })
+    } else if (next === 'custom') {
+      void updateTask(task.id, { recurrence: { frequency: 'custom', daysOfWeek: customDays } })
+    } else {
+      void updateTask(task.id, { recurrence: { frequency: next } })
+    }
+  }
+
+  function toggleCustomDay(day: number) {
+    const next = customDays.includes(day) ? customDays.filter((d) => d !== day) : [...customDays, day].sort()
+    setCustomDays(next)
+    void updateTask(task.id, { recurrence: { frequency: 'custom', daysOfWeek: next } })
+  }
 
   function commitDuration(nextHours: string, nextMinutes: string) {
     const h = clamp(Number.parseInt(nextHours, 10) || 0, 0, 24)
@@ -123,6 +150,42 @@ export function ScheduleSection({ task }: ScheduleSectionProps) {
             <span className="text-sm text-muted-foreground">m</span>
           </div>
         </div>
+      </div>
+
+      <div className="space-y-1">
+        <Label>Repeat</Label>
+        <div className="flex flex-wrap gap-2">
+          {REPEAT_OPTIONS.map((option) => (
+            <Button
+              key={option.value}
+              type="button"
+              size="sm"
+              variant={repeatValue === option.value ? 'default' : 'outline'}
+              onClick={() => applyRepeat(option.value)}
+            >
+              {option.label}
+            </Button>
+          ))}
+        </div>
+        {repeatValue === 'custom' && (
+          <div className="flex gap-1.5 pt-1">
+            {DAY_PILLS.map((label, day) => (
+              <button
+                key={day}
+                type="button"
+                onClick={() => toggleCustomDay(day)}
+                className={cn(
+                  'flex size-8 items-center justify-center rounded-full border text-xs font-medium transition-colors',
+                  customDays.includes(day)
+                    ? 'border-primary bg-primary text-primary-foreground'
+                    : 'text-muted-foreground hover:bg-accent',
+                )}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       <p className={cn('text-sm', scheduleLabel ? 'text-foreground' : 'text-muted-foreground')}>

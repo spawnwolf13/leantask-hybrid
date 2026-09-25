@@ -1,4 +1,4 @@
-import { CalendarDays, Download, Upload } from 'lucide-react'
+import { Bell, CalendarDays, Download, Upload } from 'lucide-react'
 import { useRef, useState } from 'react'
 import {
   AlertDialog,
@@ -18,7 +18,9 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import { Label } from '@/components/ui/label'
 import { Separator } from '@/components/ui/separator'
+import { Switch } from '@/components/ui/switch'
 import {
   downloadWorkspaceBackup,
   exportWorkspace,
@@ -27,6 +29,7 @@ import {
   type WorkspaceBackup,
 } from '@/services/backup'
 import { buildIcsCalendar, downloadIcsCalendar } from '@/services/icsExport'
+import { areNotificationsEnabled, setNotificationsEnabled } from '@/services/notificationService'
 
 interface SettingsModalProps {
   open: boolean
@@ -37,6 +40,20 @@ export function SettingsModal({ open, onClose }: SettingsModalProps) {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [pendingImport, setPendingImport] = useState<WorkspaceBackup | null>(null)
   const [importError, setImportError] = useState<string | null>(null)
+  const [notificationsEnabled, setNotificationsEnabledState] = useState(() => areNotificationsEnabled())
+
+  async function handleToggleNotifications(checked: boolean) {
+    if (checked) {
+      const permission = await Notification.requestPermission()
+      if (permission !== 'granted') {
+        setNotificationsEnabledState(false)
+        setNotificationsEnabled(false)
+        return
+      }
+    }
+    setNotificationsEnabledState(checked)
+    setNotificationsEnabled(checked)
+  }
 
   async function handleExportJson() {
     const backup = await exportWorkspace()
@@ -112,6 +129,27 @@ export function SettingsModal({ open, onClose }: SettingsModalProps) {
               <CalendarDays className="size-4" />
               Export to iCalendar (.ics)
             </Button>
+          </section>
+
+          <Separator />
+
+          <section className="space-y-2">
+            <h3 className="text-sm font-medium">Notifications</h3>
+            <div className="flex items-center justify-between gap-2 rounded-md border px-3 py-2">
+              <Label htmlFor="notifications-toggle" className="flex items-center gap-2 font-normal">
+                <Bell className="size-4 text-muted-foreground" />
+                Task start/end alarms
+              </Label>
+              <Switch
+                id="notifications-toggle"
+                checked={notificationsEnabled}
+                onCheckedChange={(checked) => void handleToggleNotifications(checked)}
+              />
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Plays a chime and shows a notification when a scheduled task starts, and 5 minutes before it ends.
+              Only works while this tab or app window is open.
+            </p>
           </section>
         </DialogContent>
       </Dialog>

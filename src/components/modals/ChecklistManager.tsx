@@ -2,6 +2,7 @@ import type { DropResult } from '@hello-pangea/dnd'
 import { DragDropContext, Draggable, Droppable } from '@hello-pangea/dnd'
 import { Plus } from 'lucide-react'
 import { useState } from 'react'
+import { createPortal } from 'react-dom'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { createChecklistItem, reorderChecklistItems } from '@/db/checklistItems'
@@ -50,11 +51,17 @@ export function ChecklistManager({ task }: ChecklistManagerProps) {
             <div ref={provided.innerRef} {...provided.droppableProps} className="flex flex-col gap-1.5">
               {items.map((item, index) => (
                 <Draggable draggableId={item.id} index={index} key={item.id}>
-                  {(dragProvided) => (
-                    <div ref={dragProvided.innerRef} {...dragProvided.draggableProps}>
-                      <ChecklistItemRow item={item} dragHandleProps={dragProvided.dragHandleProps} />
-                    </div>
-                  )}
+                  {(dragProvided, dragSnapshot) => {
+                    const row = (
+                      <div ref={dragProvided.innerRef} {...dragProvided.draggableProps}>
+                        <ChecklistItemRow item={item} dragHandleProps={dragProvided.dragHandleProps} />
+                      </div>
+                    )
+                    // Escape the Dialog's translate(-50%,-50%) transform while dragging —
+                    // that transform breaks @hello-pangea/dnd's coordinate math, offsetting
+                    // the dragged clone far from the cursor. Portaling to body fixes it.
+                    return dragSnapshot.isDragging ? createPortal(row, document.body) : row
+                  }}
                 </Draggable>
               ))}
               {provided.placeholder}

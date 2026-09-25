@@ -10,6 +10,15 @@ import { updateTask } from '@/db/tasks'
 import { useCategories } from '@/hooks/useCategories'
 import { useScheduledTasks } from '@/hooks/useScheduledTasks'
 import { getCategoryColor } from '@/utils/categoryColor'
+import { getRecurrenceDaysOfWeek } from '@/utils/recurrence'
+
+function addMinutesToTimeString(time: string, durationMinutes: number): string {
+  const [hours, minutes] = time.split(':').map(Number)
+  const total = (hours * 60 + minutes + durationMinutes) % (24 * 60)
+  const endHours = Math.floor(total / 60)
+  const endMinutes = total % 60
+  return `${String(endHours).padStart(2, '0')}:${String(endMinutes).padStart(2, '0')}`
+}
 
 interface CalendarViewProps {
   onOpenTask: (taskId: string) => void
@@ -29,12 +38,28 @@ export function CalendarView({ onOpenTask }: CalendarViewProps) {
   ])
 
   const events = useMemo((): EventInput[] => {
-    // useScheduledTasks() already guarantees startDate is set for every task here.
+    // useScheduledTasks() guarantees every task here has either a startDate or a recurrence rule.
     return tasks.map((task) => {
       const color = task.color ?? getCategoryColor(task.categoryId)
       const extendedProps: TaskEventExtendedProps = {
         categoryName: categoryNameById.get(task.categoryId) ?? '',
         isCompleted: task.isCompleted,
+      }
+
+      if (task.recurrence) {
+        const daysOfWeek = getRecurrenceDaysOfWeek(task.recurrence)
+        return {
+          id: task.id,
+          title: task.title,
+          daysOfWeek,
+          startTime: task.startTime,
+          endTime: task.startTime && task.durationMinutes ? addMinutesToTimeString(task.startTime, task.durationMinutes) : undefined,
+          allDay: !task.startTime,
+          editable: false,
+          backgroundColor: color,
+          borderColor: color,
+          extendedProps,
+        }
       }
 
       if (task.startTime && task.durationMinutes) {

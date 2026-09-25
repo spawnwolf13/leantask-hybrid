@@ -24,6 +24,14 @@ export interface ImageAttachment {
   createdAt: number
 }
 
+export type RecurrenceFrequency = 'daily' | 'weekdays' | 'custom'
+
+export interface TaskRecurrence {
+  frequency: RecurrenceFrequency
+  /** 0 = Sun, 1 = Mon, ..., 6 = Sat. Only used when frequency is 'custom'. */
+  daysOfWeek?: number[]
+}
+
 export interface Task {
   id: string
   categoryId: string
@@ -38,6 +46,7 @@ export interface Task {
   color?: string
   timeSpentSeconds: number
   timerStartedAt?: string
+  recurrence?: TaskRecurrence
   images: ImageAttachment[]
   createdAt: number
   updatedAt: number

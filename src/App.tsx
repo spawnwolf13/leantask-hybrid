@@ -1,5 +1,5 @@
 import { Settings } from 'lucide-react'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { BoardView } from '@/components/board/BoardView'
 import { CalendarView } from '@/components/calendar/CalendarView'
 import { SettingsModal } from '@/components/modals/SettingsModal'
@@ -7,7 +7,9 @@ import { TaskEditModal } from '@/components/modals/TaskEditModal'
 import { StorageStatusChip } from '@/components/StorageStatusChip'
 import { ThemeToggle } from '@/components/ThemeToggle'
 import { Button } from '@/components/ui/button'
+import { Toaster } from '@/components/ui/sonner'
 import { ViewToggle, type BoardOrCalendarView } from '@/components/ViewToggle'
+import { startNotificationScheduler } from '@/services/notificationService'
 
 const VIEW_STORAGE_KEY = 'leantask-view'
 
@@ -22,6 +24,8 @@ function App() {
     setViewState(next)
     localStorage.setItem(VIEW_STORAGE_KEY, next)
   }
+
+  useEffect(() => startNotificationScheduler(), [])
 
   return (
     <div className="flex h-screen flex-col bg-background text-foreground">
@@ -49,6 +53,7 @@ function App() {
 
       <TaskEditModal taskId={openTaskId} onClose={() => setOpenTaskId(null)} />
       <SettingsModal open={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} />
+      <Toaster />
     </div>
   )
 }
