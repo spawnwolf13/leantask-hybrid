@@ -83,7 +83,7 @@ export function ScheduleSection({ task }: ScheduleSectionProps) {
   const overlaps =
     startTime && effortMinutes > 0
       ? sameDayTasks.filter((other) => {
-          if (other.id === task.id || !other.startTime || !other.durationMinutes) return false
+          if (other.id === task.id || other.isCompleted || !other.startTime || !other.durationMinutes) return false
           const aStart = toMinutes(startTime)
           const aEnd = aStart + effortMinutes
           const bStart = toMinutes(other.startTime)
