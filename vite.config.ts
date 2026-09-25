@@ -11,12 +11,13 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.svg'],
       manifest: {
-        name: 'LeanTask Hybrid',
+        name: 'LeanTask - Personal Task & Time Manager',
         short_name: 'LeanTask',
-        description: 'Offline-first Kanban board and daily time-blocking engine.',
-        theme_color: '#111827',
-        background_color: '#ffffff',
+        description: 'High-performance, offline-first personal Kanban and time-blocking planner.',
+        theme_color: '#0f172a',
+        background_color: '#0f172a',
         display: 'standalone',
+        orientation: 'any',
         start_url: '/',
         icons: [
           { src: '/icons/icon.svg', sizes: 'any', type: 'image/svg+xml', purpose: 'any' },
@@ -24,7 +25,7 @@ export default defineConfig({
         ],
       },
       workbox: {
-        globPatterns: ['**/*.{js,css,html,svg,png,ico,woff2}'],
+        globPatterns: ['**/*.{js,css,html,ico,png,svg,webp}'],
       },
     }),
   ],

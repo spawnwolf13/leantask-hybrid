@@ -5,6 +5,15 @@ function getAudioContext(): AudioContext {
   return sharedContext
 }
 
+function safeResume(ctx: AudioContext): void {
+  if (ctx.state === 'suspended') ctx.resume().catch(() => {})
+}
+
+// Autoplay policy keeps the context suspended until a user gesture; unlock it on first click.
+if (typeof window !== 'undefined') {
+  window.addEventListener('click', () => safeResume(getAudioContext()), { once: true })
+}
+
 function playTone(ctx: AudioContext, frequency: number, startTime: number, duration: number): void {
   const oscillator = ctx.createOscillator()
   const gain = ctx.createGain()
@@ -25,7 +34,7 @@ function playTone(ctx: AudioContext, frequency: number, startTime: number, durat
 /** A clean two-tone chime synthesized entirely via Web Audio — no external assets. */
 export function playChime(): void {
   const ctx = getAudioContext()
-  void ctx.resume()
+  safeResume(ctx)
   const now = ctx.currentTime
   playTone(ctx, 880, now, 0.15)
   playTone(ctx, 1318.5, now + 0.15, 0.3)
