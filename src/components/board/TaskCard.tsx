@@ -1,13 +1,15 @@
 import type { DraggableProvidedDragHandleProps } from '@hello-pangea/dnd'
-import { CalendarDays, CheckSquare, GripVertical } from 'lucide-react'
+import { CalendarDays, CheckSquare, GripVertical, Timer } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Card } from '@/components/ui/card'
 import { Checkbox } from '@/components/ui/checkbox'
 import { toggleTaskCompletion } from '@/db/tasks'
 import { useChecklistItems } from '@/hooks/useChecklistItems'
+import { useElapsedSeconds } from '@/hooks/useElapsedSeconds'
 import { useObjectUrl } from '@/hooks/useObjectUrl'
 import { cn } from '@/lib/utils'
-import { formatScheduleBadge } from '@/utils/schedule'
+import { formatDuration, formatScheduleBadge } from '@/utils/schedule'
+import { stripMarkdown } from '@/utils/stripMarkdown'
 import type { Task } from '@/types/entities'
 
 interface TaskCardProps {
@@ -20,14 +22,19 @@ interface TaskCardProps {
 export function TaskCard({ task, dragHandleProps, isDragging, onOpen }: TaskCardProps) {
   const checklistItems = useChecklistItems(task.id)
   const thumbnailUrl = useObjectUrl(task.images[0]?.blob)
+  const elapsedSeconds = useElapsedSeconds(task)
+  const isTimerRunning = Boolean(task.timerStartedAt)
 
   const completedCount = checklistItems.filter((item) => item.isCompleted).length
   const checklistMinutes = checklistItems.reduce((sum, item) => sum + (item.durationMinutes ?? 0), 0)
   const scheduleLabel = task.startDate && task.startTime ? formatScheduleBadge(task.startDate, task.startTime, task.durationMinutes) : null
+  const descriptionSnippet = task.description ? stripMarkdown(task.description) : null
+  const showTimerBadge = elapsedSeconds > 0 || isTimerRunning
 
   return (
     <Card
       onClick={onOpen}
+      style={task.color ? { borderLeftColor: task.color, borderLeftWidth: 4 } : undefined}
       className={cn(
         'cursor-pointer p-3 transition-shadow hover:shadow-md',
         isDragging && 'shadow-lg ring-2 ring-ring',
@@ -60,11 +67,15 @@ export function TaskCard({ task, dragHandleProps, isDragging, onOpen }: TaskCard
         )}
       </div>
 
+      {descriptionSnippet && (
+        <p className="mt-1 line-clamp-2 pl-6 text-xs text-muted-foreground">{descriptionSnippet}</p>
+      )}
+
       {thumbnailUrl && (
         <img src={thumbnailUrl} alt="" className="mt-2 h-16 w-full rounded object-cover" />
       )}
 
-      {(scheduleLabel || checklistItems.length > 0) && (
+      {(scheduleLabel || checklistItems.length > 0 || showTimerBadge) && (
         <div className="mt-2 flex flex-wrap gap-1.5">
           {scheduleLabel && (
             <Badge variant="outline" className="gap-1 text-[11px] font-normal text-muted-foreground">
@@ -76,6 +87,25 @@ export function TaskCard({ task, dragHandleProps, isDragging, onOpen }: TaskCard
             <Badge variant="outline" className="gap-1 text-[11px] font-normal text-muted-foreground">
               <CheckSquare className="size-3" />✓ {completedCount}/{checklistItems.length}
               {checklistMinutes > 0 && ` (${checklistMinutes}m)`}
+            </Badge>
+          )}
+          {showTimerBadge && (
+            <Badge
+              variant="outline"
+              className={cn(
+                'gap-1 text-[11px] font-normal',
+                isTimerRunning ? 'border-emerald-400 text-emerald-700 dark:text-emerald-400' : 'text-muted-foreground',
+              )}
+            >
+              {isTimerRunning ? (
+                <span className="relative flex size-2">
+                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
+                  <span className="relative inline-flex size-2 rounded-full bg-emerald-500" />
+                </span>
+              ) : (
+                <Timer className="size-3" />
+              )}
+              {formatDuration(Math.round(elapsedSeconds / 60))}
             </Badge>
           )}
         </div>

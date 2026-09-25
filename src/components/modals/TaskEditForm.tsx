@@ -12,10 +12,12 @@ import { deleteTask, updateTask } from '@/db/tasks'
 import { attachImageToTask } from '@/services/attachImage'
 import type { Task } from '@/types/entities'
 import { ChecklistManager } from './ChecklistManager'
+import { ColorPicker } from './ColorPicker'
 import { DeleteTaskDialog } from './DeleteTaskDialog'
 import { DescriptionEditor } from './DescriptionEditor'
 import { ImageAttachments } from './ImageAttachments'
 import { ScheduleSection } from './ScheduleSection'
+import { TimeTracker } from './TimeTracker'
 
 interface TaskEditFormProps {
   task: Task
@@ -68,12 +70,20 @@ export function TaskEditForm({ task, onClose }: TaskEditFormProps) {
           />
         </DialogTitle>
         <DialogDescription className="sr-only">Edit task details, checklist, and schedule.</DialogDescription>
+        <TimeTracker task={task} />
       </DialogHeader>
 
       <div className="max-h-[65vh] space-y-5 overflow-y-auto py-2">
         <section className="space-y-1.5">
           <h3 className="text-sm font-medium">Description</h3>
           <DescriptionEditor taskId={task.id} initialDescription={task.description ?? ''} />
+        </section>
+
+        <Separator />
+
+        <section className="space-y-1.5">
+          <h3 className="text-sm font-medium">Color</h3>
+          <ColorPicker taskId={task.id} color={task.color} />
         </section>
 
         <Separator />

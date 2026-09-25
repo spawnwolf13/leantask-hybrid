@@ -7,6 +7,14 @@
     <meta name="description" content="Offline-first Kanban board and daily time-blocking engine." />
     <meta name="theme-color" content="#111827" />
     <title>LeanTask Hybrid</title>
+    <script>
+      (function () {
+        var stored = localStorage.getItem('leantask-theme');
+        var prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        var isDark = stored === 'dark' || (stored !== 'light' && prefersDark);
+        if (isDark) document.documentElement.classList.add('dark');
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

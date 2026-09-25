@@ -5,6 +5,7 @@ import { CalendarView } from '@/components/calendar/CalendarView'
 import { SettingsModal } from '@/components/modals/SettingsModal'
 import { TaskEditModal } from '@/components/modals/TaskEditModal'
 import { StorageStatusChip } from '@/components/StorageStatusChip'
+import { ThemeToggle } from '@/components/ThemeToggle'
 import { Button } from '@/components/ui/button'
 import { ViewToggle, type BoardOrCalendarView } from '@/components/ViewToggle'
 
@@ -26,9 +27,12 @@ function App() {
     <div className="flex h-screen flex-col bg-background text-foreground">
       <header className="flex items-center justify-between border-b px-3 py-2">
         <ViewToggle view={view} onChange={setView} />
-        <Button variant="ghost" size="icon" onClick={() => setIsSettingsOpen(true)}>
-          <Settings className="size-4" />
-        </Button>
+        <div className="flex items-center gap-1">
+          <ThemeToggle />
+          <Button variant="ghost" size="icon" onClick={() => setIsSettingsOpen(true)}>
+            <Settings className="size-4" />
+          </Button>
+        </div>
       </header>
 
       <main className="flex flex-1 flex-col overflow-hidden">

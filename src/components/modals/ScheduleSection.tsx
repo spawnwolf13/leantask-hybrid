@@ -11,16 +11,29 @@ interface ScheduleSectionProps {
   task: Task
 }
 
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(Math.max(value, min), max)
+}
+
 export function ScheduleSection({ task }: ScheduleSectionProps) {
   const [startDate, setStartDate] = useState(task.startDate ?? '')
   const [startTime, setStartTime] = useState(task.startTime ?? '')
-  const [customDuration, setCustomDuration] = useState(task.durationMinutes?.toString() ?? '')
+  const [hours, setHours] = useState(Math.floor((task.durationMinutes ?? 0) / 60).toString())
+  const [minutes, setMinutes] = useState(((task.durationMinutes ?? 0) % 60).toString())
 
-  function commitCustomDuration() {
-    const parsed = Number.parseInt(customDuration, 10)
-    const durationMinutes = Number.isFinite(parsed) && parsed > 0 ? parsed : undefined
-    void updateTask(task.id, { durationMinutes })
-    setCustomDuration(durationMinutes?.toString() ?? '')
+  function commitDuration(nextHours: string, nextMinutes: string) {
+    const h = clamp(Number.parseInt(nextHours, 10) || 0, 0, 24)
+    const m = clamp(Number.parseInt(nextMinutes, 10) || 0, 0, 59)
+    const total = h * 60 + m
+    setHours(h.toString())
+    setMinutes(m.toString())
+    void updateTask(task.id, { durationMinutes: total > 0 ? total : undefined })
+  }
+
+  function applyPreset(preset: number) {
+    setHours(Math.floor(preset / 60).toString())
+    setMinutes((preset % 60).toString())
+    void updateTask(task.id, { durationMinutes: preset })
   }
 
   const scheduleLabel =
@@ -66,26 +79,49 @@ export function ScheduleSection({ task }: ScheduleSectionProps) {
               type="button"
               size="sm"
               variant={task.durationMinutes === preset ? 'default' : 'outline'}
-              onClick={() => void updateTask(task.id, { durationMinutes: preset })}
+              onClick={() => applyPreset(preset)}
             >
               {formatDuration(preset)}
             </Button>
           ))}
-          <Input
-            type="number"
-            min={0}
-            value={customDuration}
-            placeholder="Custom (min)"
-            onChange={(event) => setCustomDuration(event.target.value)}
-            onBlur={commitCustomDuration}
-            onKeyDown={(event) => {
-              if (event.key === 'Enter') {
-                event.preventDefault()
-                event.currentTarget.blur()
-              }
-            }}
-            className="h-9 w-28"
-          />
+        </div>
+        <div className="flex items-center gap-2 pt-1">
+          <div className="flex items-center gap-1.5">
+            <Input
+              type="number"
+              min={0}
+              max={24}
+              value={hours}
+              onChange={(event) => setHours(event.target.value)}
+              onBlur={() => commitDuration(hours, minutes)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') {
+                  event.preventDefault()
+                  event.currentTarget.blur()
+                }
+              }}
+              className="h-9 w-16"
+            />
+            <span className="text-sm text-muted-foreground">h</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <Input
+              type="number"
+              min={0}
+              max={59}
+              value={minutes}
+              onChange={(event) => setMinutes(event.target.value)}
+              onBlur={() => commitDuration(hours, minutes)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') {
+                  event.preventDefault()
+                  event.currentTarget.blur()
+                }
+              }}
+              className="h-9 w-16"
+            />
+            <span className="text-sm text-muted-foreground">m</span>
+          </div>
         </div>
       </div>
 

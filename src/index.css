@@ -4,6 +4,7 @@
 
 @layer base {
   :root {
+    color-scheme: light;
     --background: 0 0% 100%;
     --foreground: 222.2 84% 4.9%;
     --card: 0 0% 100%;
@@ -27,6 +28,7 @@
   }
 
   .dark {
+    color-scheme: dark;
     --background: 222.2 84% 4.9%;
     --foreground: 210 40% 98%;
     --card: 222.2 84% 4.9%;
@@ -55,4 +57,25 @@
   body {
     @apply bg-background text-foreground;
   }
+}
+
+/* FullCalendar injects its own stylesheet with hardcoded light-theme colors that
+   don't respond to Tailwind's .dark class — override its CSS custom properties
+   directly, scoped to our wrapper so specificity wins regardless of injection order. */
+.dark .calendar-shell .fc {
+  color: hsl(var(--foreground));
+  --fc-border-color: hsl(var(--border));
+  --fc-page-bg-color: hsl(var(--background));
+  --fc-neutral-bg-color: hsl(var(--muted));
+  --fc-neutral-text-color: hsl(var(--muted-foreground));
+  --fc-today-bg-color: hsl(var(--accent) / 0.4);
+  --fc-now-indicator-color: hsl(var(--destructive));
+  --fc-button-text-color: hsl(var(--foreground));
+  --fc-button-bg-color: hsl(var(--secondary));
+  --fc-button-border-color: hsl(var(--border));
+  --fc-button-hover-bg-color: hsl(var(--accent));
+  --fc-button-hover-border-color: hsl(var(--border));
+  --fc-button-active-bg-color: hsl(var(--accent));
+  --fc-button-active-border-color: hsl(var(--ring));
+  --fc-list-event-hover-bg-color: hsl(var(--accent));
 }

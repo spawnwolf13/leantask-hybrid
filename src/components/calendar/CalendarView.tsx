@@ -31,7 +31,7 @@ export function CalendarView({ onOpenTask }: CalendarViewProps) {
   const events = useMemo((): EventInput[] => {
     // useScheduledTasks() already guarantees startDate is set for every task here.
     return tasks.map((task) => {
-      const color = getCategoryColor(task.categoryId)
+      const color = task.color ?? getCategoryColor(task.categoryId)
       const extendedProps: TaskEventExtendedProps = {
         categoryName: categoryNameById.get(task.categoryId) ?? '',
         isCompleted: task.isCompleted,

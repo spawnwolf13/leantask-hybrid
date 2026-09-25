@@ -22,6 +22,7 @@ export async function createTask(categoryId: string, columnId: string, title: st
       title,
       orderIndex: maxOrder + 1,
       isCompleted: false,
+      timeSpentSeconds: 0,
       images: [],
       createdAt: now,
       updatedAt: now,
@@ -37,11 +38,43 @@ export async function toggleTaskCompletion(taskId: string, isCompleted: boolean)
 
 type TaskEditableFields = Pick<
   Task,
-  'title' | 'description' | 'startDate' | 'startTime' | 'durationMinutes'
+  'title' | 'description' | 'startDate' | 'startTime' | 'durationMinutes' | 'color'
 >
 
 export async function updateTask(taskId: string, patch: Partial<TaskEditableFields>): Promise<void> {
   await db.tasks.update(taskId, { ...patch, updatedAt: Date.now() })
+}
+
+async function commitElapsedTime(task: Task): Promise<void> {
+  if (!task.timerStartedAt) return
+  const elapsedSeconds = Math.max(0, Math.round((Date.now() - new Date(task.timerStartedAt).getTime()) / 1000))
+  await db.tasks.update(task.id, {
+    timeSpentSeconds: task.timeSpentSeconds + elapsedSeconds,
+    timerStartedAt: undefined,
+    updatedAt: Date.now(),
+  })
+}
+
+export async function startTaskTimer(taskId: string): Promise<void> {
+  await db.transaction('rw', db.tasks, async () => {
+    // Only one task may run at a time — pause any other currently-running task first.
+    const otherRunningTasks = await db.tasks
+      .filter((task) => task.id !== taskId && task.timerStartedAt !== undefined)
+      .toArray()
+    await Promise.all(otherRunningTasks.map((task) => commitElapsedTime(task)))
+
+    await db.tasks.update(taskId, { timerStartedAt: new Date().toISOString(), updatedAt: Date.now() })
+  })
+}
+
+export async function pauseTaskTimer(taskId: string): Promise<void> {
+  const task = await db.tasks.get(taskId)
+  if (!task) return
+  await commitElapsedTime(task)
+}
+
+export async function resetTaskTimer(taskId: string): Promise<void> {
+  await db.tasks.update(taskId, { timeSpentSeconds: 0, timerStartedAt: undefined, updatedAt: Date.now() })
 }
 
 export async function deleteTask(taskId: string): Promise<void> {

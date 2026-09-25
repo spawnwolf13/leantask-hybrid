@@ -21,6 +21,19 @@ export class LeanTaskDB extends Dexie {
       checklistItems: 'id, taskId',
       syncQueue: 'id, taskId, status, createdAt',
     })
+
+    // No index changes — backfills timeSpentSeconds (non-optional) on tasks
+    // created before the time-tracker feature existed.
+    this.version(2)
+      .stores({})
+      .upgrade(async (tx) => {
+        await tx
+          .table('tasks')
+          .toCollection()
+          .modify((task) => {
+            if (task.timeSpentSeconds === undefined) task.timeSpentSeconds = 0
+          })
+      })
   }
 }
 

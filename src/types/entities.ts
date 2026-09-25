@@ -35,6 +35,9 @@ export interface Task {
   startDate?: string
   startTime?: string
   durationMinutes?: number
+  color?: string
+  timeSpentSeconds: number
+  timerStartedAt?: string
   images: ImageAttachment[]
   createdAt: number
   updatedAt: number
