@@ -1,6 +1,7 @@
 import type { DraggableProvidedDragHandleProps } from '@hello-pangea/dnd'
 import { format, parseISO } from 'date-fns'
-import { CalendarDays, CheckSquare, Copy, Flag, GripVertical, MoreHorizontal, Repeat, Timer } from 'lucide-react'
+import { CalendarDays, CheckSquare, Copy, Flag, GripVertical, MoreHorizontal, Repeat, Timer, Trash2 } from 'lucide-react'
+import { useState } from 'react'
 import { Badge } from '@/components/ui/badge'
 import { Card } from '@/components/ui/card'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -10,7 +11,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { duplicateTask, toggleTaskCompletion } from '@/db/tasks'
+import { DeleteTaskDialog } from '@/components/modals/DeleteTaskDialog'
+import { deleteTask, duplicateTask, toggleTaskCompletion } from '@/db/tasks'
 import { useChecklistItems } from '@/hooks/useChecklistItems'
 import { useElapsedSeconds } from '@/hooks/useElapsedSeconds'
 import { useObjectUrl } from '@/hooks/useObjectUrl'
@@ -28,6 +30,7 @@ interface TaskCardProps {
 }
 
 export function TaskCard({ task, dragHandleProps, isDragging, onOpen }: TaskCardProps) {
+  const [isDeleteOpen, setIsDeleteOpen] = useState(false)
   const checklistItems = useChecklistItems(task.id)
   const thumbnailUrl = useObjectUrl(task.images[0]?.blob)
   const elapsedSeconds = useElapsedSeconds(task)
@@ -40,6 +43,7 @@ export function TaskCard({ task, dragHandleProps, isDragging, onOpen }: TaskCard
   const showTimerBadge = elapsedSeconds > 0 || isTimerRunning
 
   return (
+    <>
     <Card
       onClick={onOpen}
       style={task.color ? { borderLeftColor: task.color, borderLeftWidth: 4 } : undefined}
@@ -79,6 +83,13 @@ export function TaskCard({ task, dragHandleProps, isDragging, onOpen }: TaskCard
             <DropdownMenuItem onSelect={() => void duplicateTask(task.id)}>
               <Copy className="size-4" />
               Duplicate
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              className="text-destructive focus:bg-destructive/10 focus:text-destructive"
+              onSelect={() => setIsDeleteOpen(true)}
+            >
+              <Trash2 className="size-4" />
+              Delete Task
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
@@ -149,5 +160,15 @@ export function TaskCard({ task, dragHandleProps, isDragging, onOpen }: TaskCard
         </div>
       )}
     </Card>
+    <DeleteTaskDialog
+      open={isDeleteOpen}
+      taskTitle={task.title}
+      onCancel={() => setIsDeleteOpen(false)}
+      onConfirm={() => {
+        setIsDeleteOpen(false)
+        void deleteTask(task.id)
+      }}
+    />
+    </>
   )
 }
