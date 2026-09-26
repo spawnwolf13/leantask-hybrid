@@ -1,4 +1,4 @@
-import { ExternalLink, Pause, Play, RotateCcw } from 'lucide-react'
+import { ExternalLink, Pause, Play, RotateCcw, X } from 'lucide-react'
 import { useState } from 'react'
 import { ResetTimerDialog } from '@/components/modals/ResetTimerDialog'
 import { pauseTaskTimer, resetTaskTimer, startTaskTimer } from '@/db/tasks'
@@ -61,10 +61,17 @@ function TimerPill({ task, onOpenTask, onDismiss }: TimerPillProps) {
           >
             {isRunning ? <Pause className="size-3.5" /> : <Play className="size-3.5" />}
           </button>
-          <button type="button" className={iconButton} title="Reset timer" onClick={() => setIsResetOpen(true)}>
-            <RotateCcw className="size-3.5" />
-          </button>
-          <button type="button" className={iconButton} title="Open task" onClick={() => onOpenTask(task.id)}>
+          {!isRunning && (
+            <>
+              <button type="button" className={iconButton} title="Reset timer" onClick={() => setIsResetOpen(true)}>
+                <RotateCcw className="size-3.5" />
+              </button>
+              <button type="button" className={iconButton} title="Dismiss (keeps logged time)" onClick={onDismiss}>
+                <X className="size-3.5" />
+              </button>
+            </>
+          )}
+          <button type="button" className={iconButton} title="Jump to card" onClick={() => onOpenTask(task.id)}>
             <ExternalLink className="size-3.5" />
           </button>
         </div>
