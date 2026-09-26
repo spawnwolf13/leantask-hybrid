@@ -1,22 +1,13 @@
 import { Pause, Play, RotateCcw } from 'lucide-react'
 import { useState } from 'react'
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog'
-import { Button, buttonVariants } from '@/components/ui/button'
+import { Button } from '@/components/ui/button'
 import { pauseTaskTimer, resetTaskTimer, startTaskTimer } from '@/db/tasks'
 import { useElapsedSeconds } from '@/hooks/useElapsedSeconds'
 import { cn } from '@/lib/utils'
 import { formatDuration } from '@/utils/schedule'
 import { formatStopwatch } from '@/utils/stopwatch'
 import type { Task } from '@/types/entities'
+import { ResetTimerDialog } from './ResetTimerDialog'
 
 interface TimeTrackerProps {
   task: Task
@@ -72,29 +63,15 @@ export function TimeTracker({ task }: TimeTrackerProps) {
         {isOverBudget && ' ⚠️ over budget'}
       </span>
 
-      <AlertDialog open={isResetOpen} onOpenChange={setIsResetOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Reset time tracker?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This will permanently clear the {formatStopwatch(elapsedSeconds)} logged for this task. This cannot be
-              undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              className={buttonVariants({ variant: 'destructive' })}
-              onClick={() => {
-                void resetTaskTimer(task.id)
-                setIsResetOpen(false)
-              }}
-            >
-              Reset
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <ResetTimerDialog
+        open={isResetOpen}
+        elapsedSeconds={elapsedSeconds}
+        onOpenChange={setIsResetOpen}
+        onConfirm={() => {
+          void resetTaskTimer(task.id)
+          setIsResetOpen(false)
+        }}
+      />
     </div>
   )
 }
