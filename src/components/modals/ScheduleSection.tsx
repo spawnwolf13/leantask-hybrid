@@ -1,5 +1,5 @@
 import { useLiveQuery } from 'dexie-react-hooks'
-import { addDays, format, parseISO } from 'date-fns'
+import { addDays, addMinutes, format, parseISO } from 'date-fns'
 import { Plus, Trash2 } from 'lucide-react'
 import { useState } from 'react'
 import { Button } from '@/components/ui/button'
@@ -49,6 +49,22 @@ export function ScheduleSection({ task }: ScheduleSectionProps) {
   const [blocks, setBlocks] = useState<TaskScheduleBlock[]>(task.scheduleBlocks ?? [])
   const hasBlocks = blocks.length > 0
   const totalBlockMinutes = blocks.reduce((sum, block) => sum + block.durationMinutes, 0)
+
+  // A block "overflows" if it starts after the deadline, or starts on the deadline day but its
+  // end time (date + startTime + durationMinutes) spills past midnight into the next day.
+  const overflowingBlockIds = new Set(
+    dueDate
+      ? blocks
+          .filter((block) => {
+            if (block.date > dueDate) return true
+            if (block.date < dueDate) return false
+            const end = addMinutes(parseISO(`${block.date}T${block.startTime}`), block.durationMinutes)
+            return format(end, 'yyyy-MM-dd') > dueDate
+          })
+          .map((block) => block.id)
+      : [],
+  )
+  const hasOverflow = overflowingBlockIds.size > 0
 
   const savedMinutes = task.durationMinutes ?? 0
   useDirtyFlag(
@@ -240,7 +256,13 @@ export function ScheduleSection({ task }: ScheduleSectionProps) {
         {hasBlocks && (
           <div className="space-y-2">
             {blocks.map((block, index) => (
-              <div key={block.id} className="flex flex-wrap items-end gap-2 rounded-md border p-2">
+              <div
+                key={block.id}
+                className={cn(
+                  'flex flex-wrap items-end gap-2 rounded-md border p-2',
+                  overflowingBlockIds.has(block.id) && 'border-destructive ring-1 ring-destructive/50',
+                )}
+              >
                 <div className="space-y-1">
                   <Label htmlFor={`block-date-${block.id}`} className="text-xs text-muted-foreground">
                     Session {index + 1} date
@@ -310,6 +332,15 @@ export function ScheduleSection({ task }: ScheduleSectionProps) {
             <p className="text-sm font-medium">
               Σ {formatDuration(totalBlockMinutes)} across {blocks.length} session{blocks.length === 1 ? '' : 's'}
             </p>
+            {hasOverflow && (
+              <div
+                role="alert"
+                className="rounded border border-destructive/40 bg-destructive/10 p-2.5 text-xs font-medium text-destructive"
+              >
+                ⚠️ Deadline Exceeded: Work sessions extend past your deadline (
+                {format(parseISO(dueDate), 'MMM d, yyyy')}). Adjust session durations or extend the due date.
+              </div>
+            )}
           </div>
         )}
       </div>

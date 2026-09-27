@@ -169,7 +169,9 @@ export function CalendarView({ onOpenTask }: CalendarViewProps) {
 
     if (blockId) {
       const date = format(start, 'yyyy-MM-dd')
-      if (task.dueDate && date > task.dueDate) {
+      // Revert if the session's END (not just its start) would spill past the deadline day.
+      const end = arg.event.end ?? start
+      if (task.dueDate && format(end, 'yyyy-MM-dd') > task.dueDate) {
         arg.revert()
         return
       }
@@ -202,6 +204,11 @@ export function CalendarView({ onOpenTask }: CalendarViewProps) {
     }
 
     if (blockId) {
+      // Revert if the resized session's new end time/date would spill past the deadline day.
+      if (task.dueDate && format(end, 'yyyy-MM-dd') > task.dueDate) {
+        arg.revert()
+        return
+      }
       const nextBlocks = (task.scheduleBlocks ?? []).map((block) =>
         block.id === blockId ? { ...block, durationMinutes: differenceInMinutes(end, start) } : block,
       )
