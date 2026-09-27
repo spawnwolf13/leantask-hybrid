@@ -24,7 +24,8 @@ export function DeleteTaskDialog({ open, taskTitle, onCancel, onConfirm }: Delet
         <AlertDialogHeader>
           <AlertDialogTitle>Delete "{taskTitle}"?</AlertDialogTitle>
           <AlertDialogDescription>
-            This will permanently delete the task and its checklist. This cannot be undone.
+            This action will remove its tracked time and checklist. You can undo this from the toast for a few
+            seconds after deleting.
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>

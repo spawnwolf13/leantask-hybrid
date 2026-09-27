@@ -11,7 +11,8 @@ import { Separator } from '@/components/ui/separator'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Copy } from 'lucide-react'
 import { toast } from 'sonner'
-import { deleteTask, duplicateTask, updateTask } from '@/db/tasks'
+import { duplicateTask, updateTask } from '@/db/tasks'
+import { deleteTaskWithUndo } from '@/services/undoDelete'
 import { attachImageToTask } from '@/services/attachImage'
 import { useDirtyFlag } from '@/services/unsavedChanges'
 import type { Task } from '@/types/entities'
@@ -61,9 +62,9 @@ export function TaskEditForm({ task, defaultTab, onClose }: TaskEditFormProps) {
   }
 
   async function handleConfirmDelete() {
-    await deleteTask(task.id)
     setIsDeleteOpen(false)
     onClose()
+    await deleteTaskWithUndo(task.id)
   }
 
   return (

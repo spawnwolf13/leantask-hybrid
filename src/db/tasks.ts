@@ -1,6 +1,6 @@
 import { db } from './db'
 import { addDays, format, parseISO } from 'date-fns'
-import type { ImageAttachment, Task } from '@/types/entities'
+import type { ChecklistItem, ImageAttachment, Task } from '@/types/entities'
 
 export async function createTask(categoryId: string, columnId: string, title: string): Promise<string> {
   const id = crypto.randomUUID()
@@ -91,6 +91,29 @@ export async function deleteTask(taskId: string): Promise<void> {
     await db.checklistItems.where('taskId').equals(taskId).delete()
     await db.syncQueue.where('taskId').equals(taskId).delete()
     await db.tasks.delete(taskId)
+  })
+}
+
+export interface TaskDeletionSnapshot {
+  task: Task
+  checklistItems: ChecklistItem[]
+}
+
+/** Captures a task and its checklist exactly as stored, so a later delete can be undone verbatim. */
+export async function captureTaskSnapshot(taskId: string): Promise<TaskDeletionSnapshot | undefined> {
+  const task = await db.tasks.get(taskId)
+  if (!task) return undefined
+  const checklistItems = await db.checklistItems.where('taskId').equals(taskId).toArray()
+  return { task, checklistItems }
+}
+
+/** Re-inserts a captured task and its checklist with their original ids, order, and timer state. */
+export async function restoreTaskSnapshot(snapshot: TaskDeletionSnapshot): Promise<void> {
+  await db.transaction('rw', db.tasks, db.checklistItems, async () => {
+    await db.tasks.add(snapshot.task)
+    if (snapshot.checklistItems.length > 0) {
+      await db.checklistItems.bulkAdd(snapshot.checklistItems)
+    }
   })
 }
 

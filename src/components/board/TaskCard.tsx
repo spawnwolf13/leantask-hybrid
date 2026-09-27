@@ -23,7 +23,8 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { DeleteTaskDialog } from '@/components/modals/DeleteTaskDialog'
-import { deleteTask, duplicateTask, toggleTaskCompletion } from '@/db/tasks'
+import { duplicateTask, toggleTaskCompletion } from '@/db/tasks'
+import { deleteTaskWithUndo } from '@/services/undoDelete'
 import { useChecklistItems } from '@/hooks/useChecklistItems'
 import { useElapsedSeconds } from '@/hooks/useElapsedSeconds'
 import { useObjectUrl } from '@/hooks/useObjectUrl'
@@ -191,7 +192,7 @@ export function TaskCard({ task, dragHandleProps, isDragging, onOpen }: TaskCard
       onCancel={() => setIsDeleteOpen(false)}
       onConfirm={() => {
         setIsDeleteOpen(false)
-        void deleteTask(task.id)
+        void deleteTaskWithUndo(task.id)
       }}
     />
     </>
