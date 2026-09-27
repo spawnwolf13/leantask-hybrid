@@ -1,4 +1,6 @@
 import { useLiveQuery } from 'dexie-react-hooks'
+import { addDays, format, parseISO } from 'date-fns'
+import { Plus, Trash2 } from 'lucide-react'
 import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -8,7 +10,7 @@ import { updateTask } from '@/db/tasks'
 import { cn } from '@/lib/utils'
 import { useDirtyFlag } from '@/services/unsavedChanges'
 import { DURATION_PRESETS, formatDuration, formatScheduleRange } from '@/utils/schedule'
-import type { RecurrenceFrequency, Task } from '@/types/entities'
+import type { RecurrenceFrequency, Task, TaskScheduleBlock } from '@/types/entities'
 
 function toMinutes(time: string): number {
   const [h, m] = time.split(':').map(Number)
@@ -44,6 +46,9 @@ export function ScheduleSection({ task }: ScheduleSectionProps) {
   const [hours, setHours] = useState(Math.floor((task.durationMinutes ?? 0) / 60).toString())
   const [minutes, setMinutes] = useState(((task.durationMinutes ?? 0) % 60).toString())
   const [customDays, setCustomDays] = useState<number[]>(task.recurrence?.daysOfWeek ?? [])
+  const [blocks, setBlocks] = useState<TaskScheduleBlock[]>(task.scheduleBlocks ?? [])
+  const hasBlocks = blocks.length > 0
+  const totalBlockMinutes = blocks.reduce((sum, block) => sum + block.durationMinutes, 0)
 
   const savedMinutes = task.durationMinutes ?? 0
   useDirtyFlag(
@@ -51,8 +56,45 @@ export function ScheduleSection({ task }: ScheduleSectionProps) {
     startDate !== (task.startDate ?? '') ||
       dueDate !== (task.dueDate ?? '') ||
       startTime !== (task.startTime ?? '') ||
-      (Number.parseInt(hours, 10) || 0) * 60 + (Number.parseInt(minutes, 10) || 0) !== savedMinutes,
+      (Number.parseInt(hours, 10) || 0) * 60 + (Number.parseInt(minutes, 10) || 0) !== savedMinutes ||
+      JSON.stringify(blocks) !== JSON.stringify(task.scheduleBlocks ?? []),
   )
+
+  function persistBlocks(nextBlocks: TaskScheduleBlock[]) {
+    setBlocks(nextBlocks)
+    if (nextBlocks.length === 0) {
+      void updateTask(task.id, { scheduleBlocks: [] })
+      return
+    }
+    const earliestDate = nextBlocks.map((block) => block.date).sort()[0]
+    const totalMinutes = nextBlocks.reduce((sum, block) => sum + block.durationMinutes, 0)
+    setStartDate(earliestDate)
+    void updateTask(task.id, { scheduleBlocks: nextBlocks, startDate: earliestDate, durationMinutes: totalMinutes })
+  }
+
+  function addBlock() {
+    const last = blocks[blocks.length - 1]
+    const date = last
+      ? format(addDays(parseISO(last.date), 1), 'yyyy-MM-dd')
+      : startDate || format(new Date(), 'yyyy-MM-dd')
+    persistBlocks([
+      ...blocks,
+      {
+        id: crypto.randomUUID(),
+        date,
+        startTime: last?.startTime ?? startTime ?? '09:00',
+        durationMinutes: last?.durationMinutes || effortMinutes || 60,
+      },
+    ])
+  }
+
+  function updateBlock(id: string, patch: Partial<Omit<TaskScheduleBlock, 'id'>>) {
+    persistBlocks(blocks.map((block) => (block.id === id ? { ...block, ...patch } : block)))
+  }
+
+  function removeBlock(id: string) {
+    persistBlocks(blocks.filter((block) => block.id !== id))
+  }
 
   function changeStartDate(value: string) {
     setStartDate(value)
@@ -81,7 +123,7 @@ export function ScheduleSection({ task }: ScheduleSectionProps) {
   )
   const effortMinutes = (Number.parseInt(hours, 10) || 0) * 60 + (Number.parseInt(minutes, 10) || 0)
   const overlaps =
-    startTime && effortMinutes > 0
+    !hasBlocks && startTime && effortMinutes > 0
       ? sameDayTasks.filter((other) => {
           if (other.id === task.id || other.isCompleted || !other.startTime || !other.durationMinutes) return false
           const aStart = toMinutes(startTime)
@@ -133,16 +175,18 @@ export function ScheduleSection({ task }: ScheduleSectionProps) {
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap gap-2">
-        <div className="min-w-[9rem] flex-1 space-y-1">
-          <Label htmlFor="task-start-date">Start Date</Label>
-          <Input
-            id="task-start-date"
-            type="date"
-            value={startDate}
-            max={dueDate || undefined}
-            onChange={(event) => changeStartDate(event.target.value)}
-          />
-        </div>
+        {!hasBlocks && (
+          <div className="min-w-[9rem] flex-1 space-y-1">
+            <Label htmlFor="task-start-date">Start Date</Label>
+            <Input
+              id="task-start-date"
+              type="date"
+              value={startDate}
+              max={dueDate || undefined}
+              onChange={(event) => changeStartDate(event.target.value)}
+            />
+          </div>
+        )}
         <div className="min-w-[9rem] flex-1 space-y-1">
           <Label htmlFor="task-due-date">Due Date (Deadline)</Label>
           <Input
@@ -153,18 +197,20 @@ export function ScheduleSection({ task }: ScheduleSectionProps) {
             onChange={(event) => changeDueDate(event.target.value)}
           />
         </div>
-        <div className="min-w-[9rem] flex-1 space-y-1">
-          <Label htmlFor="task-start-time">Start Time</Label>
-          <Input
-            id="task-start-time"
-            type="time"
-            value={startTime}
-            onChange={(event) => {
-              setStartTime(event.target.value)
-              void updateTask(task.id, { startTime: event.target.value || undefined })
-            }}
-          />
-        </div>
+        {!hasBlocks && (
+          <div className="min-w-[9rem] flex-1 space-y-1">
+            <Label htmlFor="task-start-time">Start Time</Label>
+            <Input
+              id="task-start-time"
+              type="time"
+              value={startTime}
+              onChange={(event) => {
+                setStartTime(event.target.value)
+                void updateTask(task.id, { startTime: event.target.value || undefined })
+              }}
+            />
+          </div>
+        )}
       </div>
       {dateError && (
         <p role="alert" className="text-sm text-destructive">
@@ -183,59 +229,153 @@ export function ScheduleSection({ task }: ScheduleSectionProps) {
         </div>
       ))}
 
+      <div className="space-y-2">
+        <div className="flex items-center justify-between">
+          <Label>Work Sessions</Label>
+          <Button type="button" size="sm" variant="outline" onClick={addBlock}>
+            <Plus className="size-3.5" />
+            {hasBlocks ? 'Add Work Session' : 'Split into Multiple Sessions'}
+          </Button>
+        </div>
+        {hasBlocks && (
+          <div className="space-y-2">
+            {blocks.map((block, index) => (
+              <div key={block.id} className="flex flex-wrap items-end gap-2 rounded-md border p-2">
+                <div className="space-y-1">
+                  <Label htmlFor={`block-date-${block.id}`} className="text-xs text-muted-foreground">
+                    Session {index + 1} date
+                  </Label>
+                  <Input
+                    id={`block-date-${block.id}`}
+                    type="date"
+                    value={block.date}
+                    max={dueDate || undefined}
+                    onChange={(event) => updateBlock(block.id, { date: event.target.value })}
+                    className="h-9 w-36"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor={`block-time-${block.id}`} className="text-xs text-muted-foreground">
+                    Start
+                  </Label>
+                  <Input
+                    id={`block-time-${block.id}`}
+                    type="time"
+                    value={block.startTime}
+                    onChange={(event) => updateBlock(block.id, { startTime: event.target.value })}
+                    className="h-9 w-28"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">Duration</Label>
+                  <div className="flex items-center gap-1">
+                    <Input
+                      type="number"
+                      min={0}
+                      max={24}
+                      value={Math.floor(block.durationMinutes / 60)}
+                      onChange={(event) => {
+                        const h = clamp(Number.parseInt(event.target.value, 10) || 0, 0, 24)
+                        updateBlock(block.id, { durationMinutes: h * 60 + (block.durationMinutes % 60) })
+                      }}
+                      className="h-9 w-14"
+                    />
+                    <span className="text-xs text-muted-foreground">h</span>
+                    <Input
+                      type="number"
+                      min={0}
+                      max={59}
+                      value={block.durationMinutes % 60}
+                      onChange={(event) => {
+                        const m = clamp(Number.parseInt(event.target.value, 10) || 0, 0, 59)
+                        updateBlock(block.id, {
+                          durationMinutes: Math.floor(block.durationMinutes / 60) * 60 + m,
+                        })
+                      }}
+                      className="h-9 w-14"
+                    />
+                    <span className="text-xs text-muted-foreground">m</span>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => removeBlock(block.id)}
+                  className="ml-auto shrink-0 text-muted-foreground hover:text-destructive"
+                  title="Remove session"
+                >
+                  <Trash2 className="size-4" />
+                </button>
+              </div>
+            ))}
+            <p className="text-sm font-medium">
+              Σ {formatDuration(totalBlockMinutes)} across {blocks.length} session{blocks.length === 1 ? '' : 's'}
+            </p>
+          </div>
+        )}
+      </div>
+
       <div className="space-y-1">
         <Label>Estimated Work Effort</Label>
-        <div className="flex flex-wrap items-center gap-2">
-          {DURATION_PRESETS.map((preset) => (
-            <Button
-              key={preset}
-              type="button"
-              size="sm"
-              variant={task.durationMinutes === preset ? 'default' : 'outline'}
-              onClick={() => applyPreset(preset)}
-            >
-              {formatDuration(preset)}
-            </Button>
-          ))}
-        </div>
-        <div className="flex items-center gap-2 pt-1">
-          <div className="flex items-center gap-1.5">
-            <Input
-              type="number"
-              min={0}
-              max={24}
-              value={hours}
-              onChange={(event) => setHours(event.target.value)}
-              onBlur={() => commitDuration(hours, minutes)}
-              onKeyDown={(event) => {
-                if (event.key === 'Enter') {
-                  event.preventDefault()
-                  event.currentTarget.blur()
-                }
-              }}
-              className="h-9 w-16"
-            />
-            <span className="text-sm text-muted-foreground">h</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <Input
-              type="number"
-              min={0}
-              max={59}
-              value={minutes}
-              onChange={(event) => setMinutes(event.target.value)}
-              onBlur={() => commitDuration(hours, minutes)}
-              onKeyDown={(event) => {
-                if (event.key === 'Enter') {
-                  event.preventDefault()
-                  event.currentTarget.blur()
-                }
-              }}
-              className="h-9 w-16"
-            />
-            <span className="text-sm text-muted-foreground">m</span>
-          </div>
-        </div>
+        {hasBlocks ? (
+          <p className="text-sm text-muted-foreground">
+            Σ {formatDuration(totalBlockMinutes)} across {blocks.length} session{blocks.length === 1 ? '' : 's'} —
+            edit individual sessions above to change this.
+          </p>
+        ) : (
+          <>
+            <div className="flex flex-wrap items-center gap-2">
+              {DURATION_PRESETS.map((preset) => (
+                <Button
+                  key={preset}
+                  type="button"
+                  size="sm"
+                  variant={task.durationMinutes === preset ? 'default' : 'outline'}
+                  onClick={() => applyPreset(preset)}
+                >
+                  {formatDuration(preset)}
+                </Button>
+              ))}
+            </div>
+            <div className="flex items-center gap-2 pt-1">
+              <div className="flex items-center gap-1.5">
+                <Input
+                  type="number"
+                  min={0}
+                  max={24}
+                  value={hours}
+                  onChange={(event) => setHours(event.target.value)}
+                  onBlur={() => commitDuration(hours, minutes)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter') {
+                      event.preventDefault()
+                      event.currentTarget.blur()
+                    }
+                  }}
+                  className="h-9 w-16"
+                />
+                <span className="text-sm text-muted-foreground">h</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <Input
+                  type="number"
+                  min={0}
+                  max={59}
+                  value={minutes}
+                  onChange={(event) => setMinutes(event.target.value)}
+                  onBlur={() => commitDuration(hours, minutes)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter') {
+                      event.preventDefault()
+                      event.currentTarget.blur()
+                    }
+                  }}
+                  className="h-9 w-16"
+                />
+                <span className="text-sm text-muted-foreground">m</span>
+              </div>
+            </div>
+          </>
+        )}
       </div>
 
       <div className="space-y-1">
@@ -274,9 +414,11 @@ export function ScheduleSection({ task }: ScheduleSectionProps) {
         )}
       </div>
 
-      <p className={cn('text-sm', scheduleLabel ? 'text-foreground' : 'text-muted-foreground')}>
-        {scheduleLabel ?? 'Set a date, time, and duration to schedule this task.'}
-      </p>
+      {!hasBlocks && (
+        <p className={cn('text-sm', scheduleLabel ? 'text-foreground' : 'text-muted-foreground')}>
+          {scheduleLabel ?? 'Set a date, time, and duration to schedule this task.'}
+        </p>
+      )}
     </div>
   )
 }

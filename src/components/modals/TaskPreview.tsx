@@ -33,13 +33,19 @@ export function TaskPreview({ task }: { task: Task }) {
   const progress = checklistItems.length > 0 ? Math.round((completedCount / checklistItems.length) * 100) : 0
   const cover = task.images[0]
 
-  const timeLabel = task.startTime
-    ? task.durationMinutes
-      ? `${task.startTime} - ${endTimeLabel(task.startTime, task.durationMinutes)}`
-      : task.startTime
-    : null
+  const sessions = task.scheduleBlocks ?? []
+  const hasMultipleSessions = sessions.length > 1
+  const totalSessionMinutes = sessions.reduce((sum, block) => sum + block.durationMinutes, 0)
+  const sortedSessions = [...sessions].sort((a, b) => (a.date + a.startTime).localeCompare(b.date + b.startTime))
 
-  const hasMeta = task.startDate || task.dueDate || timeLabel || task.durationMinutes || task.recurrence
+  const timeLabel =
+    !hasMultipleSessions && task.startTime
+      ? task.durationMinutes
+        ? `${task.startTime} - ${endTimeLabel(task.startTime, task.durationMinutes)}`
+        : task.startTime
+      : null
+
+  const hasMeta = task.startDate || task.dueDate || timeLabel || task.durationMinutes || task.recurrence || hasMultipleSessions
 
   return (
     <div className="max-h-[65vh] space-y-4 overflow-y-auto py-2">
@@ -80,11 +86,18 @@ export function TaskPreview({ task }: { task: Task }) {
               {timeLabel}
             </Badge>
           )}
-          {task.durationMinutes && (
+          {hasMultipleSessions ? (
             <Badge variant="secondary" className="gap-1.5 font-medium">
               <Hourglass className="size-3.5" />
-              Effort: {formatDuration(task.durationMinutes)}
+              {formatDuration(totalSessionMinutes)} total across {sessions.length} sessions
             </Badge>
+          ) : (
+            task.durationMinutes && (
+              <Badge variant="secondary" className="gap-1.5 font-medium">
+                <Hourglass className="size-3.5" />
+                Effort: {formatDuration(task.durationMinutes)}
+              </Badge>
+            )
           )}
           {task.recurrence && (
             <Badge variant="secondary" className="gap-1.5 font-medium">
@@ -93,6 +106,26 @@ export function TaskPreview({ task }: { task: Task }) {
             </Badge>
           )}
         </div>
+      )}
+
+      {hasMultipleSessions && (
+        <section className="space-y-2">
+          <h3 className="text-sm font-medium">Work Sessions</h3>
+          <ul className="space-y-1.5">
+            {sortedSessions.map((block, index) => (
+              <li
+                key={block.id}
+                className="flex flex-wrap items-center justify-between gap-2 rounded-md border px-3 py-2 text-sm"
+              >
+                <span className="font-medium">Session {index + 1}</span>
+                <span className="text-muted-foreground">
+                  {formatDate(block.date)} · {block.startTime}–{endTimeLabel(block.startTime, block.durationMinutes)}
+                </span>
+                <span className="text-xs text-muted-foreground">{formatDuration(block.durationMinutes)}</span>
+              </li>
+            ))}
+          </ul>
+        </section>
       )}
 
       {checklistItems.length > 0 && (

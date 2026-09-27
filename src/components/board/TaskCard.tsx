@@ -1,6 +1,17 @@
 import type { DraggableProvidedDragHandleProps } from '@hello-pangea/dnd'
 import { format, parseISO } from 'date-fns'
-import { CalendarDays, CheckSquare, Copy, Flag, GripVertical, MoreHorizontal, Repeat, Timer, Trash2 } from 'lucide-react'
+import {
+  CalendarDays,
+  CheckSquare,
+  Copy,
+  Flag,
+  GripVertical,
+  Hourglass,
+  MoreHorizontal,
+  Repeat,
+  Timer,
+  Trash2,
+} from 'lucide-react'
 import { useState } from 'react'
 import { Badge } from '@/components/ui/badge'
 import { Card } from '@/components/ui/card'
@@ -38,7 +49,15 @@ export function TaskCard({ task, dragHandleProps, isDragging, onOpen }: TaskCard
 
   const completedCount = checklistItems.filter((item) => item.isCompleted).length
   const checklistMinutes = checklistItems.reduce((sum, item) => sum + (item.durationMinutes ?? 0), 0)
-  const scheduleLabel = task.startDate && task.startTime ? formatScheduleBadge(task.startDate, task.startTime, task.durationMinutes) : null
+  const sessionCount = task.scheduleBlocks?.length ?? 0
+  const scheduleLabel =
+    sessionCount === 0 && task.startDate && task.startTime
+      ? formatScheduleBadge(task.startDate, task.startTime, task.durationMinutes)
+      : null
+  const totalEffortLabel =
+    sessionCount > 1 && task.durationMinutes
+      ? `${formatDuration(task.durationMinutes)} across ${sessionCount} sessions`
+      : null
   const descriptionSnippet = task.description ? stripMarkdown(task.description) : null
   const showTimerBadge = elapsedSeconds > 0 || isTimerRunning
 
@@ -112,12 +131,18 @@ export function TaskCard({ task, dragHandleProps, isDragging, onOpen }: TaskCard
         <img src={thumbnailUrl} alt="" className="mt-2 h-16 w-full rounded object-cover" />
       )}
 
-      {(scheduleLabel || task.dueDate || task.recurrence || checklistItems.length > 0 || showTimerBadge) && (
+      {(scheduleLabel || totalEffortLabel || task.dueDate || task.recurrence || checklistItems.length > 0 || showTimerBadge) && (
         <div className="mt-2 flex flex-wrap gap-1.5">
           {scheduleLabel && (
             <Badge variant="outline" className="gap-1 text-[11px] font-normal text-muted-foreground">
               <CalendarDays className="size-3" />
               {scheduleLabel}
+            </Badge>
+          )}
+          {totalEffortLabel && (
+            <Badge variant="outline" className="gap-1 text-[11px] font-normal text-muted-foreground">
+              <Hourglass className="size-3" />
+              {totalEffortLabel}
             </Badge>
           )}
           {task.dueDate && (

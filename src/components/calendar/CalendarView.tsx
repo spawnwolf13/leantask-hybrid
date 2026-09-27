@@ -11,6 +11,7 @@ import { useCategories } from '@/hooks/useCategories'
 import { useScheduledTasks } from '@/hooks/useScheduledTasks'
 import { getCategoryColor } from '@/utils/categoryColor'
 import { getRecurrenceDaysOfWeek } from '@/utils/recurrence'
+import type { TaskScheduleBlock } from '@/types/entities'
 
 function addMinutesToTimeString(time: string, durationMinutes: number): string {
   const [hours, minutes] = time.split(':').map(Number)
@@ -29,6 +30,11 @@ interface TaskEventExtendedProps {
   isCompleted: boolean
   taskId: string
   isDueMarker?: boolean
+  blockId?: string
+}
+
+function computeEarliestDate(blocks: TaskScheduleBlock[]): string {
+  return blocks.reduce((min, block) => (block.date < min ? block.date : min), blocks[0].date)
 }
 
 export function CalendarView({ onOpenTask }: CalendarViewProps) {
@@ -49,6 +55,51 @@ export function CalendarView({ onOpenTask }: CalendarViewProps) {
         taskId: task.id,
       }
 
+      const dateOnlyEvent = (start: string, end?: string): EventInput => ({
+        id: task.id,
+        title: task.title,
+        start,
+        // FullCalendar's all-day end is exclusive, so a due date of Oct 10 ends at Oct 11.
+        end: end ? format(addDays(parseISO(end), 1), 'yyyy-MM-dd') : undefined,
+        allDay: true,
+        backgroundColor: color,
+        borderColor: color,
+        extendedProps,
+      })
+
+      // Discrete multi-day sessions take priority: each block is its own draggable/resizable event,
+      // never a single span computed from the parent task's rolled-up startDate/durationMinutes.
+      if (task.scheduleBlocks && task.scheduleBlocks.length > 0) {
+        const sessionEvents: EventInput[] = task.scheduleBlocks.map((block, index) => {
+          const start = parseISO(`${block.date}T${block.startTime}`)
+          const end = addMinutes(start, block.durationMinutes)
+          return {
+            id: `${task.id}__${block.id}`,
+            title: task.scheduleBlocks!.length > 1 ? `${task.title} · Session ${index + 1}` : task.title,
+            start,
+            end,
+            allDay: false,
+            backgroundColor: color,
+            borderColor: color,
+            extendedProps: { ...extendedProps, blockId: block.id },
+          }
+        })
+        const maxBlockDate = task.scheduleBlocks.reduce(
+          (max, block) => (block.date > max ? block.date : max),
+          task.scheduleBlocks[0].date,
+        )
+        if (task.dueDate && task.dueDate > maxBlockDate) {
+          sessionEvents.push({
+            ...dateOnlyEvent(task.dueDate),
+            id: `${task.id}:due`,
+            title: `Due: ${task.title}`,
+            editable: false,
+            extendedProps: { ...extendedProps, isDueMarker: true },
+          })
+        }
+        return sessionEvents
+      }
+
       if (task.recurrence) {
         const daysOfWeek = getRecurrenceDaysOfWeek(task.recurrence)
         return {
@@ -64,18 +115,6 @@ export function CalendarView({ onOpenTask }: CalendarViewProps) {
           extendedProps,
         }
       }
-
-      const dateOnlyEvent = (start: string, end?: string): EventInput => ({
-        id: task.id,
-        title: task.title,
-        start,
-        // FullCalendar's all-day end is exclusive, so a due date of Oct 10 ends at Oct 11.
-        end: end ? format(addDays(parseISO(end), 1), 'yyyy-MM-dd') : undefined,
-        allDay: true,
-        backgroundColor: color,
-        borderColor: color,
-        extendedProps,
-      })
 
       // Only tasks with an explicit start time AND estimated effort get a slot on the hourly grid,
       // and only on their start day — a multi-day span never becomes one giant time block.
@@ -119,17 +158,34 @@ export function CalendarView({ onOpenTask }: CalendarViewProps) {
     onOpenTask((arg.event.extendedProps as TaskEventExtendedProps).taskId)
   }
 
-  // Deadlines are fixed milestones: drag/resize only ever touches startDate/startTime/durationMinutes.
+  // Deadlines are fixed milestones: drag/resize only ever touches startDate/startTime/durationMinutes
+  // (or, for a session block, only that block's own date/startTime/durationMinutes).
   async function handleEventDrop(arg: EventDropArg) {
     const start = arg.event.start
     if (!start) return
+    const { taskId, blockId } = arg.event.extendedProps as TaskEventExtendedProps
+    const task = tasks.find((candidate) => candidate.id === taskId)
+    if (!task) return
+
+    if (blockId) {
+      const date = format(start, 'yyyy-MM-dd')
+      if (task.dueDate && date > task.dueDate) {
+        arg.revert()
+        return
+      }
+      const nextBlocks = (task.scheduleBlocks ?? []).map((block) =>
+        block.id === blockId ? { ...block, date, startTime: format(start, 'HH:mm') } : block,
+      )
+      await updateTask(taskId, { scheduleBlocks: nextBlocks, startDate: computeEarliestDate(nextBlocks) })
+      return
+    }
+
     const startDate = format(start, 'yyyy-MM-dd')
-    const dueDate = tasks.find((candidate) => candidate.id === arg.event.id)?.dueDate
-    if (dueDate && startDate > dueDate) {
+    if (task.dueDate && startDate > task.dueDate) {
       arg.revert()
       return
     }
-    await updateTask(arg.event.id, {
+    await updateTask(taskId, {
       startDate,
       startTime: arg.event.allDay ? undefined : format(start, 'HH:mm'),
     })
@@ -137,12 +193,24 @@ export function CalendarView({ onOpenTask }: CalendarViewProps) {
 
   async function handleEventResize(arg: EventResizeDoneArg) {
     const { start, end } = arg.event
+    const { taskId, blockId } = arg.event.extendedProps as TaskEventExtendedProps
+    const task = tasks.find((candidate) => candidate.id === taskId)
     // An all-day span's edges are set via Start/Due Date in the task modal, not by resizing.
-    if (!start || !end || arg.event.allDay) {
+    if (!task || !start || !end || arg.event.allDay) {
       arg.revert()
       return
     }
-    await updateTask(arg.event.id, {
+
+    if (blockId) {
+      const nextBlocks = (task.scheduleBlocks ?? []).map((block) =>
+        block.id === blockId ? { ...block, durationMinutes: differenceInMinutes(end, start) } : block,
+      )
+      const totalMinutes = nextBlocks.reduce((sum, block) => sum + block.durationMinutes, 0)
+      await updateTask(taskId, { scheduleBlocks: nextBlocks, durationMinutes: totalMinutes })
+      return
+    }
+
+    await updateTask(taskId, {
       startDate: format(start, 'yyyy-MM-dd'),
       startTime: format(start, 'HH:mm'),
       durationMinutes: differenceInMinutes(end, start),

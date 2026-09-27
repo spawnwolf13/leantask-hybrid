@@ -32,6 +32,13 @@ export interface TaskRecurrence {
   daysOfWeek?: number[]
 }
 
+export interface TaskScheduleBlock {
+  id: string
+  date: string
+  startTime: string
+  durationMinutes: number
+}
+
 export interface Task {
   id: string
   categoryId: string
@@ -45,6 +52,10 @@ export interface Task {
   startTime?: string
   /** Estimated work effort — not the span between start and due date. */
   durationMinutes?: number
+  /** Discrete multi-day work sessions. When present and non-empty, these are the source of truth
+   *  for scheduling, and startDate/startTime/durationMinutes are kept in sync as rollups for
+   *  board badges, ICS export, and any code that hasn't been taught about blocks. */
+  scheduleBlocks?: TaskScheduleBlock[]
   color?: string
   timeSpentSeconds: number
   timerStartedAt?: string

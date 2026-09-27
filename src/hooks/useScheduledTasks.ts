@@ -5,7 +5,13 @@ import type { Task } from '@/types/entities'
 export function useScheduledTasks(): Task[] {
   return useLiveQuery(
     async (): Promise<Task[]> =>
-      (await db.tasks.toArray()).filter((task) => Boolean(task.startDate) || Boolean(task.dueDate) || Boolean(task.recurrence)),
+      (await db.tasks.toArray()).filter(
+        (task) =>
+          Boolean(task.startDate) ||
+          Boolean(task.dueDate) ||
+          Boolean(task.recurrence) ||
+          Boolean(task.scheduleBlocks?.length),
+      ),
     [],
     [],
   )
