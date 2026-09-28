@@ -1,4 +1,5 @@
 import { db } from './db'
+import type { ChecklistItem, Column, Task } from '@/types/entities'
 
 export async function createColumn(categoryId: string, name: string): Promise<string> {
   const id = crypto.randomUUID()
@@ -38,5 +39,30 @@ export async function deleteColumn(id: string): Promise<void> {
     await db.syncQueue.where('taskId').anyOf(taskIds).delete()
     await db.tasks.bulkDelete(taskIds)
     await db.columns.delete(id)
+  })
+}
+
+export interface ColumnDeletionSnapshot {
+  column: Column
+  tasks: Task[]
+  checklistItems: ChecklistItem[]
+}
+
+/** Captures a column, its tasks, and their checklists exactly as stored, for a verbatim undo. */
+export async function captureColumnSnapshot(columnId: string): Promise<ColumnDeletionSnapshot | undefined> {
+  const column = await db.columns.get(columnId)
+  if (!column) return undefined
+  const tasks = await db.tasks.where({ columnId }).toArray()
+  const taskIds = tasks.map((task) => task.id)
+  const checklistItems = taskIds.length > 0 ? await db.checklistItems.where('taskId').anyOf(taskIds).toArray() : []
+  return { column, tasks, checklistItems }
+}
+
+/** Re-inserts a captured column and its tasks/checklists with their original ids, order, and timer state. */
+export async function restoreColumnSnapshot(snapshot: ColumnDeletionSnapshot): Promise<void> {
+  await db.transaction('rw', db.columns, db.tasks, db.checklistItems, async () => {
+    await db.columns.add(snapshot.column)
+    if (snapshot.tasks.length > 0) await db.tasks.bulkAdd(snapshot.tasks)
+    if (snapshot.checklistItems.length > 0) await db.checklistItems.bulkAdd(snapshot.checklistItems)
   })
 }

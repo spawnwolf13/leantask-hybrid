@@ -10,7 +10,8 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import { buttonVariants } from '@/components/ui/button'
-import { deleteColumn, getColumnTaskCount } from '@/db/columns'
+import { getColumnTaskCount } from '@/db/columns'
+import { deleteColumnWithUndo } from '@/services/undoDelete'
 import type { Column } from '@/types/entities'
 
 interface DeleteColumnDialogProps {
@@ -33,8 +34,8 @@ export function DeleteColumnDialog({ column, onClose }: DeleteColumnDialogProps)
           <AlertDialogTitle>Delete "{column?.name}"?</AlertDialogTitle>
           <AlertDialogDescription>
             {taskCount > 0
-              ? `This column has ${taskCount} task${taskCount === 1 ? '' : 's'}. Deleting it will permanently remove them all. This cannot be undone.`
-              : 'This will permanently delete the column. This cannot be undone.'}
+              ? `This column contains ${taskCount} task${taskCount === 1 ? '' : 's'}. Deleting it will permanently remove all tasks and their logged time. Are you sure?`
+              : 'This will permanently delete the column. You can undo this from the toast for a few seconds after deleting.'}
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
@@ -43,8 +44,8 @@ export function DeleteColumnDialog({ column, onClose }: DeleteColumnDialogProps)
             className={buttonVariants({ variant: 'destructive' })}
             onClick={() => {
               if (!column) return
-              void deleteColumn(column.id)
               onClose()
+              void deleteColumnWithUndo(column.id)
             }}
           >
             Delete
